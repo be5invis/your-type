@@ -481,7 +481,7 @@ function translate(a) {
 			const fn0 = translate(a[a.length - 1]);
 			return a.slice(1, -1).reduceRight((fn, term) => new Abstraction(translate(term), fn), fn0);
 		} else if (a[0] === "begin") {
-			return translate(a.slice(1).reduce((x, y) => ["seq", x, y]));
+			return translate(a.slice(1).reduceRight((y, x) => ["seq", x, y]));
 		} else if (a.length === 2) {
 			return new Apply(translate(a[0]), translate(a[1]));
 		} else {
