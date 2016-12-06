@@ -113,13 +113,11 @@ class Apply extends Form {
 	}
 }
 
-class FDef extends Form {
-	constructor(name, p, q, local) {
+class Abstraction extends Form {
+	constructor(parameter, body) {
 		super();
-		this.name = name;
-		this.parameter = p;
-		this.body = q;
-		this.local = !!local;
+		this.parameter = parameter;
+		this.body = body;
 	}
 	inference(env) {
 		const e = new Environment(env);
@@ -128,22 +126,39 @@ class FDef extends Form {
 		const fntype0 = type.arrow(alpha, beta);
 		// Assign the type to the sub-environment as alpha -> beta
 		e.variables.set(this.parameter.name, alpha);
-		e.variables.set(this.name, type.arrow(alpha, beta));
 		e.typeslots.set(beta, this.body.inference(e));
 		const fnType = fntype0.applySub(e.typeslots);
-		if (this.local) { // If the function is embedded, do not return a polymorphic result
-			env.variables.set(this.name, fnType);
-			return fnType;
-		} else { // otherwise, return polymorphic
-			const fsm = new Set();
-			fnType.getFreeSlots(e.typeslots, fsm);
-			const polytype = new type.Polymorphic(fsm, fnType);
+		return fnType;
+	}
+	inspect() {
+		return "\\" + this.parameter.inspect() + ". " + this.body.inspect();
+	}
+}
+
+class Definition extends Form {
+	constructor(name, body) {
+		super();
+		this.name = name;
+		this.argument = body;
+	}
+	inference(env) {
+		// Infering definitions ALLOW usage of polymorphism.
+		const e = new Environment(env);
+		const alpha = newtype("D");
+		e.variables.set(this.name, alpha);
+		const argtype = this.argument.inference(e).applySub(e.typeslots);
+		const fsm = new Set();
+		argtype.getFreeSlots(e.typeslots, fsm);
+		if (fsm.size) {
+			const polytype = new type.Polymorphic(fsm, argtype);
 			env.variables.set(this.name, polytype);
 			return polytype.instance(newtype);
+		} else {
+			env.variables.set(this.name, argtype);
 		}
 	}
 	inspect() {
-		return "function " + this.name + " " + this.parameter.inspect() + " = " + this.body.inspect();
+		return "define " + this.name + " = " + this.argument.inspect();
 	}
 }
 
@@ -162,6 +177,25 @@ class Assign extends Form {
 		return "set " + this.name + " = " + this.argument.inspect();
 	}
 }
+class AssignRec extends Form {
+	constructor(name, p) {
+		super();
+		this.name = name;
+		this.argument = p;
+	}
+	inference(env) {
+		const e = new Environment(env);
+		const alpha = newtype("D");
+		e.variables.set(this.name, alpha);
+		const t = this.argument.inference(e);
+		env.variables.set(this.name, t);
+		return t;
+	}
+	inspect() {
+		return "set rec " + this.name + " = " + this.argument.inspect();
+	}
+}
+
 
 const env = new Environment(null);
 // This is a prelude
@@ -237,15 +271,17 @@ env.variables.set("hold",
 
 function translate(a) {
 	if (a instanceof Array) {
-		if (a[0] === "function") {
-			return new FDef(a[1], translate(a[2]), translate(a[3]));
+		if (a[0] === "define" && a.length === 3) {
+			return new Definition(a[1], translate(a[2]));
+		} else if (a[0] === "define") {
+			return new Definition(a[1], translate(["lambda"].concat(a.slice(2))));
 		} else if (a[0] === "let" && a.length === 3) {
 			return new Assign(a[1], translate(a[2]));
 		} else if (a[0] === "letf" && a.length === 4) {
-			return new FDef(a[1], translate(a[2]), translate(a[3]), true);
-		} else if (a[0] === "lambda") {
-			const t = newvar();
-			return translate(["seq", ["letf", t, a[1], a[2]], t]);
+			return new AssignRec(a[1], new Abstraction(translate(a[2]), translate(a[3])));
+		} else if (a[0] === "lambda" && a.length >= 3) {
+			const fn0 = translate(a[a.length - 1]);
+			return a.slice(1, -1).reduceRight((fn, term) => new Abstraction(translate(term), fn), fn0);
 		} else if (a[0] === "begin") {
 			return translate(a.slice(1).reduce((x, y) => ["seq", x, y]));
 		} else if (a.length === 2) {
@@ -259,38 +295,39 @@ function translate(a) {
 }
 
 const f_id = translate(
-	["function", "crz", "x", ["seq",
-		["letf", "crz1", "y", ["seq",
-			["letf", "crz2", "z",
-				["seq", "x", ["seq", "y", "z"]]],
-			"crz2"]
-		],
-		"crz1"]]);
+	["define", "crz", "x", "y", "z",
+		["seq", "x", ["seq", "y", "z"]]]);
 const f_length = translate(
-	["function", "length", "a",
+	["define", "length", "a",
 		["if", ["empty?", "a"],
 			["hold", "0"],
 			["hold", ["+", "1", ["length", ["cdr", "a"]]]]]]);
 const f_sum = translate(
-	["function", "sum", "a",
+	["define", "sum", "a",
 		["if", ["empty?", "a"],
 			["hold", "0"],
 			["hold", ["+", ["car", "a"], ["sum", ["cdr", "a"]]]]]]);
 const f_map = translate(
-	["function", "map", "f", ["begin",
-		["lambda", "a", ["if", ["empty?", "a"],
+	["define", "map", "f", "a",
+		["if", ["empty?", "a"],
 			["hold", ["newlist", "nothing"]],
 			["hold", ["cons",
 				["f", ["car", "a"]],
-				["map", "f", ["cdr", "a"]]]]]]]]);
+				["map", "f", ["cdr", "a"]]]]]]);
+const inc1 = translate(
+	["define", "mapplus1", "a", ["map", ["+", "1"] , "a"]]
+);
+
+console.log(f_map);
 
 const foo = translate(
-	["function", "foo", "f",
+	["define", "foo", "f",
 		["f", "+", ["f", "0"], ["f", "1"]]]);
 
 f_id.inference(env);
 f_length.inference(env);
 f_sum.inference(env);
 f_map.inference(env);
+inc1.inference(env);
 // foo.inference(env); // Should be an error
 console.log(env.variables);
