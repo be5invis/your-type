@@ -275,6 +275,7 @@ class Definition extends Form {
 		super();
 		this.name = name;
 		this.argument = body;
+		this.derivedEnv = null;
 	}
 	inference(env) {
 		// Infering definitions ALLOW usage of polymorphism.
@@ -289,10 +290,12 @@ class Definition extends Form {
 			env.setVariable(this.name, polytype, this.argument, env);
 			const rettype = polytype.instance(newtype).type;
 			this.typing = new TypeAssignment(rettype);
+			this.derivedEnv = e;
 			return rettype;
 		} else {
 			env.setVariable(this.name, argtype, this.argument, env);
 			this.typing = new TypeAssignment(argtype);
+			this.derivedEnv = e;
 			return argtype;
 		}
 	}
@@ -300,7 +303,7 @@ class Definition extends Form {
 		return "define ".yellow + this.name + " = " + this.argument.inspect();
 	}
 	materialize(m, env) {
-		let n = new Definition(this.name, this.argument.materialize(m, env));
+		let n = new Definition(this.name, this.argument.materialize(m, this.derivedEnv));
 		n.typing = new TypeAssignment(this.materializeTypeOf(m, env));
 		return n;
 	}
