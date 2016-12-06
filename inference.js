@@ -470,9 +470,6 @@ function translate(a) {
 	}
 }
 
-const f_id = translate(
-	["define", "crz", "x", "y", "z",
-		["seq", "x", ["seq", "y", "z"]]]);
 const f_length = translate(
 	["define", "length", "a",
 		["if", ["empty?", "a"],
@@ -500,16 +497,10 @@ const f_main = translate(
 			["sum", ["cons", "0", ["newlist", "nothing"]]],
 			["map", ["lambda", "x", "x"], ["cons", "nothing", ["newlist", "nothing"]]]]]);
 
-const foo = translate(
-	["define", "foo", "f",
-		["f", "+", ["f", "0"], ["f", "1"]]]);
-
-f_id.inference(env);
 f_length.inference(env);
 f_sum.inference(env);
 f_map.inference(env);
 f_main.inference(env);
-// foo.inference(env); // Should be an error
 
 const f_main_mat = f_main.materialize(new Map(), env);
 env.variables.get("main").form = f_main_mat;
@@ -531,5 +522,4 @@ for (let [k, v] of env.variables.entries()) {
 		}
 	}
 }
-console.log(f_main_mat);
 
