@@ -98,6 +98,19 @@ class Form {
 	}
 	inspect() {}
 	materialize(m, env) {}
+	materializeTypeOf(m, env) {
+		if (!this.typing) {
+			throw new Error(`${util.inspect(this)} is not typed.`)
+		}
+		let t = this.typing.type.applySub(env.typeslots).applySub(m);
+		if (t instanceof type.Polymorphic) {
+			throw new Error(`${util.inspect(this)} is not polymorphic.`)
+		}
+		if (!t.isClosed()) {
+			console.log(`The type of <${util.inspect(this)}> is not closed: ${util.inspect(t)} .`);
+		}
+		return t;
+	}
 }
 // Identifier
 class Id extends Form {
@@ -155,7 +168,7 @@ class Id extends Form {
 		// Otherwise, it is a plain variable.
 		// Materialize it in the simple way.
 		let n = new Id(this.name);
-		n.typing = new TypeAssignment(this.typing.type.applySub(env.typeslots).applySub(m));
+		n.typing = new TypeAssignment(this.materializeTypeOf(m, env));
 		return n;
 	}
 }
@@ -215,7 +228,7 @@ class Apply extends Form {
 	}
 	materialize(m, env) {
 		let n = new Apply(this.fn.materialize(m, env), this.argument.materialize(m, env));
-		n.typing = new TypeAssignment(this.typing.type.applySub(env.typeslots).applySub(m));
+		n.typing = new TypeAssignment(this.materializeTypeOf(m, env));
 		return n;
 	}
 }
@@ -248,7 +261,7 @@ class Abstraction extends Form {
 		let n = new Abstraction(
 			this.parameter.materialize(m, this.derivedEnv),
 			this.body.materialize(m, this.derivedEnv));
-		n.typing = new TypeAssignment(this.typing.type.applySub(env.typeslots).applySub(m));
+		n.typing = new TypeAssignment(this.materializeTypeOf(m, env));
 		return n;
 	}
 }
@@ -283,11 +296,8 @@ class Definition extends Form {
 		return "define ".yellow + this.name + " = " + this.argument.inspect();
 	}
 	materialize(m, env) {
-		if (this.typeing instanceof type.Polymorphic) {
-			throw new Error(`Attempt to materialize a polymorphic definition ${this}`);
-		}
 		let n = new Definition(this.name, this.argument.materialize(m, env));
-		n.typing = new TypeAssignment(this.typing.type.applySub(env.typeslots).applySub(m));
+		n.typing = new TypeAssignment(this.materializeTypeOf(m, env));
 		return n;
 	}
 }
@@ -310,7 +320,7 @@ class Assign extends Form {
 	}
 	materialize(m, env) {
 		let n = new Assign(this.name, this.argument.materialize(m, env));
-		n.typing = new TypeAssignment(this.typing.type.applySub(env.typeslots).applySub(m));
+		n.typing = new TypeAssignment(this.materializeTypeOf(m, env));
 		return n;
 	}
 }
@@ -337,7 +347,7 @@ class AssignRec extends Form {
 	}
 	materialize(m, env) {
 		let n = new Assign(this.name, this.argument.materialize(m, this.derivedEnv));
-		n.typing = new TypeAssignment(this.typing.type.applySub(env.typeslots).applySub(m));
+		n.typing = new TypeAssignment(this.materializeTypeOf(m, env));
 		return n;
 	}
 }
@@ -425,8 +435,13 @@ env.setVariable("1", type.prim("int"));
 env.setVariable("nothing", type.prim("unit"));
 // +
 env.setVariable("+",
-	type.arrow(type.prim("int"),
-		type.arrow(type.prim("int"), type.prim("int"))));
+	new type.Polymorphic(
+		new Set([type.slot("a"), type.slot("b")]),
+		type.arrow(
+			type.slot("a"),
+			type.arrow(type.slot("b"), type.slot("b")))),
+	new Native("+"),
+	env);
 // if : forall a. bool -> thunk a -> thunk a -> a
 env.setVariable("if",
 	new type.Polymorphic(
@@ -501,6 +516,7 @@ f_length.inference(env);
 f_sum.inference(env);
 f_map.inference(env);
 f_main.inference(env);
+console.log(env.variables.get("main"));
 
 const f_main_mat = f_main.materialize(new Map(), env);
 env.variables.get("main").form = f_main_mat;
@@ -522,4 +538,3 @@ for (let [k, v] of env.variables.entries()) {
 		}
 	}
 }
-

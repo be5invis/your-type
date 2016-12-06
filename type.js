@@ -11,6 +11,9 @@ class Monomorphic {
 	}
 	getFreeSlots(m, a) {} // Get all free slots
 	freeFrom(s) {} // type t is free freom slot s
+	isClosed() {
+		return false;
+	}
 }
 // Slots for free variables
 class Slot extends Monomorphic {
@@ -38,6 +41,9 @@ class Slot extends Monomorphic {
 	freeFrom(s) {
 		return this !== s;
 	}
+	isClosed() {
+		return false;
+	}
 }
 // Primitive types
 class Primitive extends Monomorphic {
@@ -58,6 +64,9 @@ class Primitive extends Monomorphic {
 		return t && t instanceof Primitive && this.name === t.name;
 	}
 	freeFrom(s) {
+		return true;
+	}
+	isClosed() {
 		return true;
 	}
 }
@@ -103,6 +112,9 @@ class Composite extends Monomorphic {
 	}
 	freeFrom(s) {
 		return this.ctor.freeFrom(s) && this.argument.freeFrom(s);
+	}
+	isClosed() {
+		return this.ctor.isClosed() && this.argument.isClosed();
 	}
 }
 
