@@ -41,7 +41,7 @@ class VariableNotFoundError extends Error {
 class VariableDefinition {
 	constructor(type, form, defenv) {
 		this.type = type; // Its type
-		this.form = form; // When present, means that this variable is assigned to a polymorphic type and can be materialized
+		this.form = form; // When present, means that this variable is assigned to a function definition and can be materialized
 		this.defenv = defenv; // Its defining environment
 		this.materialized = new Map(); // Its materialized versions, mangler -> form
 	}
@@ -49,6 +49,8 @@ class VariableDefinition {
 		return util.inspect({type: this.type, form: this.form, materialized: this.materialized});
 	}
 	materialize(mangle, m) {
+		// Materialize a definition body.
+		// When it is already mangled, do nothing
 		if (this.type instanceof type.Polymorphic) {
 			if (!this.materialized.has(mangle)) {
 				this.materialized.set(mangle, null);
@@ -62,6 +64,7 @@ class VariableDefinition {
 		}
 	}
 }
+
 // Type assignments
 class TypeAssignment {
 	constructor(type, instanceAssignments) {
@@ -122,12 +125,13 @@ class Id extends Form {
 	materialize(m, env) {
 		let id = env.lookup(this.name);
 		if (id && id.form) {
-			// this variable is polymorphic.
+			// this variable is a function definition.
 			// materialize it.
 			const idTyping = this.typing;
 			const t = idTyping.type.applySub(env.typeslots).applySub(m);
 
 			if (id.type instanceof type.Polymorphic) {
+				// It is polymorphic; return an mangled result
 				const mangle = t.getMangler();
 
 				let m1 = new Map();
@@ -141,13 +145,15 @@ class Id extends Form {
 				n.typing = t;
 				return n;
 			} else {
+				// It is monomorphic; Materialize its content and return
 				id.materialize(null, new Map());
 				let n = new Id(this.name);
 				n.typing = t;
 				return n;
 			}
 		}
-
+		// Otherwise, it is a plain variable.
+		// Materialize it in the simple way.
 		let n = new Id(this.name);
 		n.typing = new TypeAssignment(this.typing.type.applySub(env.typeslots).applySub(m));
 		return n;
@@ -219,6 +225,7 @@ class Abstraction extends Form {
 		super();
 		this.parameter = parameter;
 		this.body = body;
+		this.derivedEnv = null;
 	}
 	inference(env) {
 		const e = new Environment(env);
@@ -231,13 +238,16 @@ class Abstraction extends Form {
 		const fnType = fntype0.applySub(e.typeslots);
 		this.parameter.typing = new TypeAssignment(alpha.applySub(e.typeslots), null);
 		this.typing = new TypeAssignment(fnType, null);
+		this.derivedEnv = e;
 		return fnType;
 	}
 	inspect() {
 		return "\\" + this.parameter.inspect() + ". " + this.body.inspect();
 	}
 	materialize(m, env) {
-		let n = new Abstraction(this.parameter.materialize(m, env), this.body.materialize(m, env));
+		let n = new Abstraction(
+			this.parameter.materialize(m, this.derivedEnv),
+			this.body.materialize(m, this.derivedEnv));
 		n.typing = new TypeAssignment(this.typing.type.applySub(env.typeslots).applySub(m));
 		return n;
 	}
@@ -310,6 +320,7 @@ class AssignRec extends Form {
 		super();
 		this.name = name;
 		this.argument = p;
+		this.derivedEnv = null;
 	}
 	inference(env) {
 		const e = new Environment(env);
@@ -318,13 +329,14 @@ class AssignRec extends Form {
 		const t = this.argument.inference(e);
 		env.setVariable(this.name, t, null);
 		this.typing = new TypeAssignment(t);
+		this.derivedEnv = e;
 		return t;
 	}
 	inspect() {
 		return "set rec ".yellow + this.name + " = " + this.argument.inspect();
 	}
 	materialize(m, env) {
-		let n = new Assign(this.name, this.argument.materialize(m, env));
+		let n = new Assign(this.name, this.argument.materialize(m, this.derivedEnv));
 		n.typing = new TypeAssignment(this.typing.type.applySub(env.typeslots).applySub(m));
 		return n;
 	}
@@ -521,16 +533,3 @@ for (let [k, v] of env.variables.entries()) {
 }
 console.log(f_main_mat);
 
-/*
-
-env.typeAssignments.forEach(function (assignment, expr) {
-	console.log(" / Form =", expr);
-	if (assignment.instanceAssignments) {
-		for (let [k, v] of assignment.instanceAssignments.entries()) {
-			console.log(" |   Instance", k, ":", v, " => ", v.applySub(env.typeslots));
-		}
-	}
-	console.log(" \\ Type =", assignment.type.applySub(env.typeslots));
-});
-
-*/

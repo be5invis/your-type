@@ -122,20 +122,6 @@ function convertToNumberingScheme(number) {
 
 class Polymorphic {
 	constructor(quantifier, base) {
-
-		// // Rename quantified slots
-		// let N = 1;
-		// let s = new Set();
-		// let m = new Map();
-		// for (let key of quantifier) {
-		// 	let param = slot(convertToNumberingScheme(N));
-		// 	m.set(key, param);
-		// 	s.add(param);
-		// 	N++;
-		// }
-		// this.quantifier = s;
-		// this.base = base.applySub(m);
-
 		this.quantifier = quantifier;
 		this.base = base;
 	}
