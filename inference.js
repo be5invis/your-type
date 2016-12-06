@@ -107,7 +107,7 @@ class Form {
 			throw new Error(`${util.inspect(this)} is not polymorphic.`)
 		}
 		if (!t.isClosed()) {
-			console.log(`The type of <${util.inspect(this)}> is not closed: ${util.inspect(t)} .`);
+			throw new Error(`The type of <${util.inspect(this)}> is not closed: ${util.inspect(t)} .`);
 		}
 		return t;
 	}
@@ -150,7 +150,11 @@ class Id extends Form {
 				let m1 = new Map();
 				if (idTyping.instanceAssignments) {
 					for (let [k, v] of idTyping.instanceAssignments) {
-						m1.set(k, v.applySub(env.typeslots).applySub(m));
+						const v1 = v.applySub(env.typeslots).applySub(m);
+						if (!v1.isClosed()) {
+							throw new Error(`Cannot materialize ${this.name} with a non-closed type ${util.inspect(v1)} assigned to ${util.inspect(k)}.`);
+						}
+						m1.set(k, v1);
 					}
 					id.materialize(mangle, m1);
 				}
@@ -516,7 +520,6 @@ f_length.inference(env);
 f_sum.inference(env);
 f_map.inference(env);
 f_main.inference(env);
-console.log(env.variables.get("main"));
 
 const f_main_mat = f_main.materialize(new Map(), env);
 env.variables.get("main").form = f_main_mat;
