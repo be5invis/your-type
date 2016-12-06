@@ -20,6 +20,7 @@ class Environment {
 		this.parent = parent;
 		this.variables = new Map();
 		this.typeslots = parent ? parent.typeslots : new Map();
+		this.typeAssignments = parent ? parent.typeAssignments : new Map();
 	}
 	lookup(name) {
 		if (this.variables.has(name)) return this.variables.get(name);
@@ -27,7 +28,12 @@ class Environment {
 		else return this.parent.lookup(name);
 	}
 }
-
+class TypeAssignment {
+	constructor(type, instanceAssignments) {
+		this.type = type;
+		this.instanceAssignments = instanceAssignments;
+	}
+}
 
 class TypeIncompatibleError extends Error {
 	constructor(form, desired, resulted, context) {
@@ -61,14 +67,17 @@ class Id extends Form {
 		this.name = name;
 	}
 	inference(env) {
-		const r = env.lookup(this.name);
+		let r = env.lookup(this.name);
+		let instanceAssignments = null;
 		if (!r) throw new VariableNotFoundError(this.name);
 		// Create an instance if its type is polymorphic
 		if (r instanceof type.Polymorphic) {
-			return r.instance(newtype);
-		} else {
-			return r;
+			const inst = r.instance(newtype);
+			r = inst.type;
+			instanceAssignments = inst.variables;
 		}
+		env.typeAssignments.set(this, new TypeAssignment(r, instanceAssignments));
+		return r;
 	}
 	inspect() {
 		return this.name;
@@ -102,6 +111,7 @@ class Apply extends Form {
 		}
 
 		const tresult = t.applySub(env.typeslots);
+		env.typeAssignments.set(this, new TypeAssignment(tresult, null));
 		return tresult;
 	}
 	inspect() {
@@ -129,6 +139,7 @@ class Abstraction extends Form {
 		e.variables.set(this.parameter.name, alpha);
 		e.typeslots.set(beta, this.body.inference(e));
 		const fnType = fntype0.applySub(e.typeslots);
+		env.typeAssignments.set(this, new TypeAssignment(fnType, null));
 		return fnType;
 	}
 	inspect() {
@@ -153,9 +164,10 @@ class Definition extends Form {
 		if (fsm.size) {
 			const polytype = new type.Polymorphic(fsm, argtype);
 			env.variables.set(this.name, polytype);
-			return polytype.instance(newtype);
+			return polytype.instance(newtype).type;
 		} else {
 			env.variables.set(this.name, argtype);
+			return argtype;
 		}
 	}
 	inspect() {
@@ -333,3 +345,12 @@ f_map.inference(env);
 f_mapcrz.inference(env);
 // foo.inference(env); // Should be an error
 console.log(env.variables);
+env.typeAssignments.forEach(function (assignment, expr) {
+	console.log(" / Form =", expr);
+	if (assignment.instanceAssignments) {
+		for (let [k, v] of assignment.instanceAssignments.entries()) {
+			console.log(" |   Instance", k, ":", v, " => ", v.applySub(env.typeslots));
+		}
+	}
+	console.log(" \\ Type =", assignment.type.applySub(env.typeslots));
+});
