@@ -492,6 +492,8 @@ function translate(a) {
 	}
 }
 
+const f_id = translate(
+	["define", "id", "a", "a"]);
 const f_length = translate(
 	["define", "length", "a",
 		["if", ["empty?", "a"],
@@ -515,10 +517,12 @@ const f_map = translate(
 const f_main = translate(
 	["define", "main",
 		["begin",
+			['id', 'id', 'id', 'id', '0'],
 			["map", ["lambda", "x", ["+", "x", "1"]], ["cons", "0", ["newlist", "nothing"]]],
 			["sum", ["cons", "0", ["newlist", "nothing"]]],
 			["map", ["lambda", "x", "x"], ["cons", "nothing", ["newlist", "nothing"]]]]]);
 
+f_id.inference(env);
 f_length.inference(env);
 f_sum.inference(env);
 f_map.inference(env);
