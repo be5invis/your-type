@@ -113,6 +113,7 @@ class Apply extends Form {
 	}
 }
 
+// A lambda abstraction \parameter.body
 class Abstraction extends Form {
 	constructor(parameter, body) {
 		super();
@@ -134,7 +135,7 @@ class Abstraction extends Form {
 		return "\\" + this.parameter.inspect() + ". " + this.body.inspect();
 	}
 }
-
+// Term definition, recursive and polymorphic
 class Definition extends Form {
 	constructor(name, body) {
 		super();
@@ -161,7 +162,7 @@ class Definition extends Form {
 		return "define " + this.name + " = " + this.argument.inspect();
 	}
 }
-
+// Plain assignment, monomorphic
 class Assign extends Form {
 	constructor(name, p) {
 		super();
@@ -177,6 +178,7 @@ class Assign extends Form {
 		return "set " + this.name + " = " + this.argument.inspect();
 	}
 }
+// Recursive assignment, monomorphic
 class AssignRec extends Form {
 	constructor(name, p) {
 		super();
@@ -314,8 +316,8 @@ const f_map = translate(
 			["hold", ["cons",
 				["f", ["car", "a"]],
 				["map", "f", ["cdr", "a"]]]]]]);
-const inc1 = translate(
-	["define", "mapplus1", "a", ["map", ["+", "1"] , "a"]]
+const f_mapcrz = translate(
+	["define", "map_crz", ["map", "crz"]]
 );
 
 console.log(f_map);
@@ -328,6 +330,6 @@ f_id.inference(env);
 f_length.inference(env);
 f_sum.inference(env);
 f_map.inference(env);
-inc1.inference(env);
+f_mapcrz.inference(env);
 // foo.inference(env); // Should be an error
 console.log(env.variables);
