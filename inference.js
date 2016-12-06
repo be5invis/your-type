@@ -15,26 +15,7 @@ const newvar = function () {
 	};
 }();
 
-class Environment {
-	constructor(parent) {
-		this.parent = parent;
-		this.variables = new Map();
-		this.typeslots = parent ? parent.typeslots : new Map();
-		this.typeAssignments = parent ? parent.typeAssignments : new Map();
-	}
-	lookup(name) {
-		if (this.variables.has(name)) return this.variables.get(name);
-		else if (!this.parent) return null;
-		else return this.parent.lookup(name);
-	}
-}
-class TypeAssignment {
-	constructor(type, instanceAssignments) {
-		this.type = type;
-		this.instanceAssignments = instanceAssignments;
-	}
-}
-
+// Errors
 class TypeIncompatibleError extends Error {
 	constructor(form, desired, resulted, context) {
 		super();
@@ -56,34 +37,139 @@ class VariableNotFoundError extends Error {
 	}
 }
 
-class Form {
-	constructor() {}
-	inspect() {}
+// A variable definition.
+class VariableDefinition {
+	constructor(type, form, defenv) {
+		this.type = type; // Its type
+		this.form = form; // When present, means that this variable is assigned to a polymorphic type and can be materialized
+		this.defenv = defenv; // Its defining environment
+		this.materialized = new Map(); // Its materialized versions, mangler -> form
+	}
+	inspect() {
+		return util.inspect({type: this.type, form: this.form, materialized: this.materialized});
+	}
+	materialize(mangle, m) {
+		if (this.type instanceof type.Polymorphic) {
+			if (!this.materialized.has(mangle)) {
+				this.materialized.set(mangle, null);
+				this.materialized.set(mangle, this.form.materialize(m, this.defenv));
+			}
+		} else {
+			if (!this.materialized.has("*")) {
+				this.materialized.set("*", null);
+				this.materialized.set("*", this.form = this.form.materialize(m, this.defenv));
+			}
+		}
+	}
+}
+// Type assignments
+class TypeAssignment {
+	constructor(type, instanceAssignments) {
+		this.type = type;
+		this.instanceAssignments = instanceAssignments;
+	}
+}
+// Environment
+class Environment {
+	constructor(parent) {
+		this.parent = parent;
+		this.variables = new Map();
+		this.typeslots = parent ? parent.typeslots : new Map();
+	}
+	lookup(name) {
+		if (this.variables.has(name)) return this.variables.get(name);
+		else if (!this.parent) return null;
+		else return this.parent.lookup(name);
+	}
+	setVariable(name, type, form, env) {
+		this.variables.set(name, new VariableDefinition(type, form, env));
+	}
 }
 
+
+
+// Program Form
+class Form {
+	constructor() {
+		this.typing = null;
+	}
+	inspect() {}
+	materialize(m, env) {}
+}
+// Identifier
 class Id extends Form {
 	constructor(name) {
 		super();
 		this.name = name;
 	}
 	inference(env) {
-		let r = env.lookup(this.name);
-		let instanceAssignments = null;
-		if (!r) throw new VariableNotFoundError(this.name);
+		let id = env.lookup(this.name);
+		if (!id) throw new VariableNotFoundError(this.name);
+
+		let r = id.type, instanceAssignments = null;
 		// Create an instance if its type is polymorphic
 		if (r instanceof type.Polymorphic) {
 			const inst = r.instance(newtype);
 			r = inst.type;
 			instanceAssignments = inst.variables;
 		}
-		env.typeAssignments.set(this, new TypeAssignment(r, instanceAssignments));
+		this.typing = new TypeAssignment(r, instanceAssignments);
 		return r;
 	}
 	inspect() {
 		return this.name;
 	}
-}
+	materialize(m, env) {
+		let id = env.lookup(this.name);
+		if (id && id.form) {
+			// this variable is polymorphic.
+			// materialize it.
+			const idTyping = this.typing;
+			const t = idTyping.type.applySub(env.typeslots).applySub(m);
 
+			if (id.type instanceof type.Polymorphic) {
+				const mangle = t.getMangler();
+
+				let m1 = new Map();
+				if (idTyping.instanceAssignments) {
+					for (let [k, v] of idTyping.instanceAssignments) {
+						m1.set(k, v.applySub(env.typeslots).applySub(m));
+					}
+					id.materialize(mangle, m1);
+				}
+				let n = new MangledId(this.name, mangle);
+				n.typing = t;
+				return n;
+			} else {
+				id.materialize(null, new Map());
+				let n = new Id(this.name);
+				n.typing = t;
+				return n;
+			}
+		}
+
+		let n = new Id(this.name);
+		n.typing = new TypeAssignment(this.typing.type.applySub(env.typeslots).applySub(m));
+		return n;
+	}
+}
+// Mangled identifier
+class MangledId extends Id {
+	constructor(name, mangler) {
+		super(name);
+		this.mangler = mangler;
+	}
+	inference(env) {
+		throw new Error("Should not be here.")
+	}
+	materialize(env) {
+		throw new Error("It is already materialized.")
+	}
+	inspect() {
+		return "[".blue + this.name + "/".blue + this.mangler.blue + "]".blue;
+	}
+}
+// Application
 class Apply extends Form {
 	constructor(p, q) {
 		super();
@@ -111,7 +197,7 @@ class Apply extends Form {
 		}
 
 		const tresult = t.applySub(env.typeslots);
-		env.typeAssignments.set(this, new TypeAssignment(tresult, null));
+		this.typing = new TypeAssignment(tresult, null);
 		return tresult;
 	}
 	inspect() {
@@ -121,9 +207,13 @@ class Apply extends Form {
 			return this.fn.inspect() + " " + this.argument.inspect();
 		}
 	}
+	materialize(m, env) {
+		let n = new Apply(this.fn.materialize(m, env), this.argument.materialize(m, env));
+		n.typing = new TypeAssignment(this.typing.type.applySub(env.typeslots).applySub(m));
+		return n;
+	}
 }
-
-// A lambda abstraction \parameter.body
+// Lambda abstraction, \parameter.body
 class Abstraction extends Form {
 	constructor(parameter, body) {
 		super();
@@ -136,14 +226,20 @@ class Abstraction extends Form {
 		const beta = newtype("B");
 		const fntype0 = type.arrow(alpha, beta);
 		// Assign the type to the sub-environment as alpha -> beta
-		e.variables.set(this.parameter.name, alpha);
+		e.setVariable(this.parameter.name, alpha);
 		e.typeslots.set(beta, this.body.inference(e));
 		const fnType = fntype0.applySub(e.typeslots);
-		env.typeAssignments.set(this, new TypeAssignment(fnType, null));
+		this.parameter.typing = new TypeAssignment(alpha.applySub(e.typeslots), null);
+		this.typing = new TypeAssignment(fnType, null);
 		return fnType;
 	}
 	inspect() {
 		return "\\" + this.parameter.inspect() + ". " + this.body.inspect();
+	}
+	materialize(m, env) {
+		let n = new Abstraction(this.parameter.materialize(m, env), this.body.materialize(m, env));
+		n.typing = new TypeAssignment(this.typing.type.applySub(env.typeslots).applySub(m));
+		return n;
 	}
 }
 // Term definition, recursive and polymorphic
@@ -157,23 +253,35 @@ class Definition extends Form {
 		// Infering definitions ALLOW usage of polymorphism.
 		const e = new Environment(env);
 		const alpha = newtype("D");
-		e.variables.set(this.name, alpha);
+		e.setVariable(this.name, alpha, null);
 		const argtype = this.argument.inference(e).applySub(e.typeslots);
 		const fsm = new Set();
 		argtype.getFreeSlots(e.typeslots, fsm);
 		if (fsm.size) {
 			const polytype = new type.Polymorphic(fsm, argtype);
-			env.variables.set(this.name, polytype);
-			return polytype.instance(newtype).type;
+			env.setVariable(this.name, polytype, this.argument, env);
+			const rettype = polytype.instance(newtype).type;
+			this.typing = new TypeAssignment(rettype);
+			return rettype;
 		} else {
-			env.variables.set(this.name, argtype);
+			env.setVariable(this.name, argtype, this.argument, env);
+			this.typing = new TypeAssignment(argtype);
 			return argtype;
 		}
 	}
 	inspect() {
-		return "define " + this.name + " = " + this.argument.inspect();
+		return "define ".yellow + this.name + " = " + this.argument.inspect();
+	}
+	materialize(m, env) {
+		if (this.typeing instanceof type.Polymorphic) {
+			throw new Error(`Attempt to materialize a polymorphic definition ${this}`);
+		}
+		let n = new Definition(this.name, this.argument.materialize(m, env));
+		n.typing = new TypeAssignment(this.typing.type.applySub(env.typeslots).applySub(m));
+		return n;
 	}
 }
+
 // Plain assignment, monomorphic
 class Assign extends Form {
 	constructor(name, p) {
@@ -183,11 +291,17 @@ class Assign extends Form {
 	}
 	inference(env) {
 		const t = this.argument.inference(env);
-		env.variables.set(this.name, t);
+		env.setVariable(this.name, t, null);
+		this.typing = new TypeAssignment(t);
 		return t;
 	}
 	inspect() {
-		return "set " + this.name + " = " + this.argument.inspect();
+		return "set ".yellow + this.name + " = " + this.argument.inspect();
+	}
+	materialize(m, env) {
+		let n = new Assign(this.name, this.argument.materialize(m, env));
+		n.typing = new TypeAssignment(this.typing.type.applySub(env.typeslots).applySub(m));
+		return n;
 	}
 }
 // Recursive assignment, monomorphic
@@ -200,45 +314,71 @@ class AssignRec extends Form {
 	inference(env) {
 		const e = new Environment(env);
 		const alpha = newtype("D");
-		e.variables.set(this.name, alpha);
+		e.setVariable(this.name, alpha, null);
 		const t = this.argument.inference(e);
-		env.variables.set(this.name, t);
+		env.setVariable(this.name, t, null);
+		this.typing = new TypeAssignment(t);
 		return t;
 	}
 	inspect() {
-		return "set rec " + this.name + " = " + this.argument.inspect();
+		return "set rec ".yellow + this.name + " = " + this.argument.inspect();
+	}
+	materialize(m, env) {
+		let n = new Assign(this.name, this.argument.materialize(m, env));
+		n.typing = new TypeAssignment(this.typing.type.applySub(env.typeslots).applySub(m));
+		return n;
 	}
 }
-
+// Special node, Native
+class Native extends Form {
+	constructor(name) {
+		super();
+		this.name = name;
+	}
+	inspect() {
+		return "[native " + this.name + "]";
+	}
+	materialize(m, env) {
+		return new Native(this.name);
+	}
+}
 
 const env = new Environment(null);
 // This is a prelude
 // call : forall a b. (a -> b) -> a -> b;
-env.variables.set("call",
+env.setVariable("call",
 	new type.Polymorphic(
 		new Set([type.slot("a"), type.slot("b")]),
 		type.arrow(type.arrow(type.slot("a"), type.slot("b")), type.arrow(type.slot("a"), type.slot("b")))
-	));
+	),
+	new Native("call"),
+	env);
 // seq : forall a b. a -> b -> b
-env.variables.set("seq",
+env.setVariable("seq",
 	new type.Polymorphic(
 		new Set([type.slot("a"), type.slot("b")]),
 		type.arrow(type.slot("a"), type.arrow(type.slot("b"), type.slot("b")))
-	));
+	),
+	new Native("seq"),
+	env);
 // car : forall a. list a -> a
-env.variables.set("car",
+env.setVariable("car",
 	new type.Polymorphic(
 		new Set([type.slot("a")]),
 		type.arrow(type.cmpt(type.prim("list"), type.slot("a")), type.slot("a"))
-	));
+	),
+	new Native("car"),
+	env);
 // cdr : forall a. list a -> list a
-env.variables.set("cdr",
+env.setVariable("cdr",
 	new type.Polymorphic(
 		new Set([type.slot("a")]),
 		type.arrow(type.cmpt(type.prim("list"), type.slot("a")), type.cmpt(type.prim("list"), type.slot("a")))
-	));
+	),
+	new Native("cdr"),
+	env);
 // cons : forall a. a -> list a -> list a
-env.variables.set("cons",
+env.setVariable("cons",
 	new type.Polymorphic(
 		new Set([type.slot("a")]),
 		type.arrow(
@@ -246,42 +386,52 @@ env.variables.set("cons",
 			type.arrow(
 				type.cmpt(type.prim("list"), type.slot("a")),
 				type.cmpt(type.prim("list"), type.slot("a"))))
-	));
+	),
+	new Native("cons"),
+	env);
 // newlist : forall a. unit -> list a
-env.variables.set("newlist",
+env.setVariable("newlist",
 	new type.Polymorphic(
 		new Set([type.slot("a")]),
 		type.arrow(
 			type.prim("unit"),
 			type.cmpt(type.prim("list"), type.slot("a")))
-	));
+	),
+	new Native("newlist"),
+	env);
 // empty? : forall a. list a -> bool
-env.variables.set("empty?",
+env.setVariable("empty?",
 	new type.Polymorphic(
 		new Set([type.slot("a")]),
 		type.arrow(type.cmpt(type.prim("list"), type.slot("a")), type.prim("bool"))
-	));
+	),
+	new Native("empty?"),
+	env);
 // 0 and 1
-env.variables.set("0", type.prim("int"));
-env.variables.set("1", type.prim("int"));
-env.variables.set("nothing", type.prim("unit"));
+env.setVariable("0", type.prim("int"));
+env.setVariable("1", type.prim("int"));
+env.setVariable("nothing", type.prim("unit"));
 // +
-env.variables.set("+",
+env.setVariable("+",
 	type.arrow(type.prim("int"),
 		type.arrow(type.prim("int"), type.prim("int"))));
 // if : forall a. bool -> thunk a -> thunk a -> a
-env.variables.set("if",
+env.setVariable("if",
 	new type.Polymorphic(
 		new Set([type.slot("a")]),
 		type.arrow(type.prim("bool"),
 			type.arrow(type.cmpt(type.prim("thunk"), type.slot("a")),
-				type.arrow(type.cmpt(type.prim("thunk"), type.slot("a")), type.slot("a"))))));
+				type.arrow(type.cmpt(type.prim("thunk"), type.slot("a")), type.slot("a"))))),
+	new Native("if"),
+	env);
 // hold : forall a. a -> thunk a
-env.variables.set("hold",
+env.setVariable("hold",
 	new type.Polymorphic(
 		new Set([type.slot("a")]),
 		type.arrow(type.slot("a"),
-			type.cmpt(type.prim("thunk"), type.slot("a")))));
+			type.cmpt(type.prim("thunk"), type.slot("a")))),
+	new Native("hold"),
+	env);
 
 function translate(a) {
 	if (a instanceof Array) {
@@ -325,14 +475,18 @@ const f_map = translate(
 	["define", "map", "f", "a",
 		["if", ["empty?", "a"],
 			["hold", ["newlist", "nothing"]],
-			["hold", ["cons",
-				["f", ["car", "a"]],
-				["map", "f", ["cdr", "a"]]]]]]);
-const f_mapcrz = translate(
-	["define", "map_crz", ["map", "crz"]]
-);
+			["hold", ["begin",
+				["let", "head", ["f", ["car", "a"]]],
+				["let", "rear", ["map", "f", ["cdr", "a"]]],
+				["cons", "head", "rear"]]]]]);
 
-console.log(f_map);
+
+const f_main = translate(
+	["define", "main",
+		["begin",
+			["map", ["lambda", "x", ["+", "x", "1"]], ["cons", "0", ["newlist", "nothing"]]],
+			["sum", ["cons", "0", ["newlist", "nothing"]]],
+			["map", ["lambda", "x", "x"], ["cons", "nothing", ["newlist", "nothing"]]]]]);
 
 const foo = translate(
 	["define", "foo", "f",
@@ -342,9 +496,33 @@ f_id.inference(env);
 f_length.inference(env);
 f_sum.inference(env);
 f_map.inference(env);
-f_mapcrz.inference(env);
+f_main.inference(env);
 // foo.inference(env); // Should be an error
-console.log(env.variables);
+
+const f_main_mat = f_main.materialize(new Map(), env);
+env.variables.get("main").form = f_main_mat;
+
+for (let [k, v] of env.variables.entries()) {
+	if (!(v.type instanceof type.Polymorphic)) {
+		if (v.form) {
+			console.log("monomorphic define".yellow, k, "::", v.type, "\n =", v.form);
+		} else {
+			console.log("monomorphic native".yellow, k, "::", v.type);
+		}
+	} else if (v.materialized.size) {
+		for (let [mangler, f] of v.materialized) {
+			if (f.typing) {
+				console.log("materialized define".yellow, k, "/".blue, mangler.blue, "::", f.typing.type, "\n =", f);
+			} else {
+				console.log("materialized native".yellow, k, "/".blue, mangler.blue);
+			}
+		}
+	}
+}
+console.log(f_main_mat);
+
+/*
+
 env.typeAssignments.forEach(function (assignment, expr) {
 	console.log(" / Form =", expr);
 	if (assignment.instanceAssignments) {
@@ -354,3 +532,5 @@ env.typeAssignments.forEach(function (assignment, expr) {
 	}
 	console.log(" \\ Type =", assignment.type.applySub(env.typeslots));
 });
+
+*/

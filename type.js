@@ -4,6 +4,7 @@ require("colors");
 class Monomorphic {
 	constructor() {}
 	inspect() {} // Pretty print type
+	getMangler() {} // Get a name for mangler
 	applySub(m) {} // Apply a substitution m
 	equalTo(t) { // Equality
 		return false;
@@ -19,6 +20,9 @@ class Slot extends Monomorphic {
 	}
 	inspect() {
 		return ("'" + this.name).blue.bold + "".reset;
+	}
+	getMangler() {
+		return ("'" + this.name);
 	}
 	applySub(m) {
 		const r = m.get(this);
@@ -43,6 +47,9 @@ class Primitive extends Monomorphic {
 	}
 	inspect() {
 		return this.name.yellow + "".reset;
+	}
+	getMangler() {
+		return this.name;
 	}
 	applySub(m) {
 		return this;
@@ -75,6 +82,13 @@ class Composite extends Monomorphic {
 			return this.ctor.inspect() + " (" + this.argument.inspect() + ")";
 		} else {
 			return this.ctor.inspect() + " " + this.argument.inspect() + "";
+		}
+	}
+	getMangler() {
+		if (this.argument instanceof Composite) {
+			return this.ctor.getMangler() + " (" + this.argument.getMangler() + ")";
+		} else {
+			return this.ctor.getMangler() + " " + this.argument.getMangler() + "";
 		}
 	}
 	applySub(m) {
