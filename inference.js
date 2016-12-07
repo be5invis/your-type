@@ -491,10 +491,10 @@ const program = [
 	["declare", "even?", ["->", "int", "bool"]],
 	["define", "odd?", "x", ["if", ["==", "x", "0"],
 		["then", "false"],
-		["else", ["not", ["even?", ["-", "x", "1"]]]]]],
+		["else", ["even?", ["-", "x", "1"]]]]],
 	["define", "even?", "x", ["if", ["==", "x", "0"],
 		["then", "true"],
-		["else", ["not", ["odd?", ["-", "x", "1"]]]]]],
+		["else", ["odd?", ["-", "x", "1"]]]]],
 
 	["declare", "id", ["forall", "'a", ["->", "'a", "'a"]]],
 	["define", "id", "a", "a"],
