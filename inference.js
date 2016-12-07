@@ -49,7 +49,6 @@ class VariableDefinition {
 		return util.inspect({type: this.type, form: this.form, materialized: this.materialized});
 	}
 	materialize(name, mangle, m) {
-		console.log("Materialize", name, m);
 		// Materialize a definition body.
 		// When it is already mangled, do nothing
 		if (this.type instanceof type.Polymorphic) {
@@ -90,10 +89,10 @@ class Environment {
 	setVariable(name, type, form, env) {
 		this.variables.set(name, new VariableDefinition(type, form, env));
 	}
-	* names() {
+	* allVariables() {
 		yield*this.variables.entries();
 		if (this.parent) {
-			yield*this.parent.names();
+			yield*this.parent.allVariables();
 		}
 	}
 }
@@ -386,7 +385,7 @@ class Block extends Form {
 
 		// Pass 3: Decide the type of each binding
 		let existingFreeSlots = new Set();
-		for (let [k, v] of env.names()) {
+		for (let [k, v] of env.allVariables()) {
 			if (v.type instanceof type.Polymorphic) continue;
 			v.type.applySub(env.typeslots).getFreeSlots(env.typeslots, existingFreeSlots);
 		}
@@ -395,7 +394,7 @@ class Block extends Form {
 			let freeSlots = new Set();
 			argtype.getFreeSlots(e1.typeslots, freeSlots); // grab the free slots of argtype
 
-			for (let s of existingFreeSlots) {
+			for (let s of existingFreeSlots) { // Remove all slots used by other variables
 				freeSlots.delete(s);
 			}
 
@@ -407,7 +406,10 @@ class Block extends Form {
 			}
 		}
 
+		// Pass 4: Remove forward declaration terms
 		this.terms = this.terms.filter(x => !!x.form);
+
+		// Pass 5: Inference the body
 		const t = this.body.inference(e2);
 		this.typing = new TypeAssignment(t);
 		this.e1 = e1;

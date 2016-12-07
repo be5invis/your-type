@@ -43,6 +43,8 @@ const program = [
 					["rear", ["map", "f", ["cdr", "a"]]],
 					["cons", "head", "rear"]]]]],
 		["2", ["+", "1", "1"]],
+		["odd?", "x", ["if", ["==", "x", "0"], ["then", "false"], ["else", ["even?", ["-", "x", "1"]]]]],
+		["even?", "x", ["if", ["==", "x", "0"], ["then", "true"], ["else", ["odd?", ["-", "x", "1"]]]]],
 		["begin",
 			["idx", "1"],
 			["idx", "nothing"],
