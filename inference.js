@@ -48,7 +48,7 @@ class VariableDefinition {
 	inspect() {
 		return util.inspect({type: this.type, form: this.form, materialized: this.materialized});
 	}
-	materialize(mangle, m) {
+	materialize(name, mangle, m) {
 		// Materialize a definition body.
 		// When it is already mangled, do nothing
 		if (this.type instanceof type.Polymorphic) {
@@ -56,11 +56,13 @@ class VariableDefinition {
 				this.materialized.set(mangle, null);
 				this.materialized.set(mangle, this.form.materialize(m, this.defenv));
 			}
+			return new MangledId(name, mangle);
 		} else {
 			if (!this.materialized.has("*")) {
 				this.materialized.set("*", null);
 				this.materialized.set("*", this.form = this.form.materialize(m, this.defenv));
 			}
+			return new Id(name);
 		}
 	}
 }
@@ -136,44 +138,40 @@ class Id extends Form {
 		return this.name;
 	}
 	materialize(m, env) {
-		let id = env.lookup(this.name);
-		if (id && id.form) {
+		let vDef = env.lookup(this.name);
+		const t = this.materializeTypeOf(m, env);
+		if (vDef && vDef.form) {
 			// this variable is a function definition.
 			// materialize it.
 			const idTyping = this.typing;
-			const t = idTyping.type.applySub(env.typeslots).applySub(m);
 
-			if (id.type instanceof type.Polymorphic) {
+			if (vDef.type instanceof type.Polymorphic) {
 				// It is polymorphic; return an mangled result
-				const mangle = t.getMangler();
-
+				// idTyping.instanceAssignments is always present
 				let m1 = new Map();
-				if (idTyping.instanceAssignments) {
-					for (let [k, v] of idTyping.instanceAssignments) {
-						const v1 = v.applySub(env.typeslots).applySub(m);
-						if (!v1.isClosed()) {
-							throw new Error(`Cannot materialize ${this.name} with a non-closed type ${util.inspect(v1)} assigned to ${util.inspect(k)}.`);
-						}
-						m1.set(k, v1);
+				for (let [k, v] of idTyping.instanceAssignments) {
+					const v1 = v.applySub(env.typeslots).applySub(m);
+					if (!v1.isClosed()) {
+						throw new Error(`Cannot materialize ${this.name} with a non-closed type ${util.inspect(v1)} assigned to ${util.inspect(k)}.`);
 					}
-					id.materialize(mangle, m1);
+					m1.set(k, v1);
 				}
-				let n = new MangledId(this.name, mangle);
+				let n = vDef.materialize(this.name, t.getMangler(), m1);
 				n.typing = t;
 				return n;
 			} else {
 				// It is monomorphic; Materialize its content and return
-				id.materialize(null, new Map());
-				let n = new Id(this.name);
+				let n = vDef.materialize(this.name, null, new Map());
 				n.typing = t;
 				return n;
 			}
+		} else {
+			// Otherwise, it is a plain variable.
+			// Materialize it in the simple way.
+			let n = new Id(this.name);
+			n.typing = new TypeAssignment(t);
+			return n;
 		}
-		// Otherwise, it is a plain variable.
-		// Materialize it in the simple way.
-		let n = new Id(this.name);
-		n.typing = new TypeAssignment(this.materializeTypeOf(m, env));
-		return n;
 	}
 }
 // Mangled identifier
@@ -517,7 +515,7 @@ const f_map = translate(
 const f_main = translate(
 	["define", "main",
 		["begin",
-			['id', 'id', 'id', 'id', '0'],
+			["id", "id", "id", "id", "0"],
 			["map", ["lambda", "x", ["+", "x", "1"]], ["cons", "0", ["newlist", "nothing"]]],
 			["sum", ["cons", "0", ["newlist", "nothing"]]],
 			["map", ["lambda", "x", "x"], ["cons", "nothing", ["newlist", "nothing"]]]]]);
