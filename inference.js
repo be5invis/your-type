@@ -49,6 +49,7 @@ class VariableDefinition {
 		return util.inspect({type: this.type, form: this.form, materialized: this.materialized});
 	}
 	materialize(name, mangle, m) {
+		console.log("Materialize", name, m);
 		// Materialize a definition body.
 		// When it is already mangled, do nothing
 		if (this.type instanceof type.Polymorphic) {
@@ -58,9 +59,9 @@ class VariableDefinition {
 			}
 			return new MangledId(name, mangle);
 		} else {
-			if (!this.materialized.has("*")) {
-				this.materialized.set("*", null);
-				this.materialized.set("*", this.form = this.form.materialize(m, this.defenv));
+			if (!this.materialized.has("")) {
+				this.materialized.set("", null);
+				this.materialized.set("", this.form = this.form.materialize(m, this.defenv));
 			}
 			return new Id(name);
 		}
@@ -89,6 +90,12 @@ class Environment {
 	setVariable(name, type, form, env) {
 		this.variables.set(name, new VariableDefinition(type, form, env));
 	}
+	* names() {
+		yield*this.variables.entries();
+		if (this.parent) {
+			yield*this.parent.names();
+		}
+	}
 }
 
 
@@ -100,7 +107,14 @@ class Form {
 	}
 	inspect() {}
 	inference() {}
-	materialize(m, env) {}
+	materialize(m, env) {
+		try {
+			return this._materialize(m, env);
+		} catch(e) {
+			console.log(this);
+			throw e;
+		}
+	}
 	materializeTypeOf(m, env) {
 		if (!this.typing) {
 			throw new Error(`${util.inspect(this)} is not typed.`)
@@ -159,7 +173,7 @@ class Limitation extends Form {
 		this.typing = new TypeAssignment(tresult, null);
 		return tresult;
 	}
-	materialize(m, env) {
+	_materialize(m, env) {
 		return this.argument.materialize(m, env);
 	}
 }
@@ -186,7 +200,7 @@ class Id extends Form {
 	inspect() {
 		return this.name;
 	}
-	materialize(m, env) {
+	_materialize(m, env) {
 		let vDef = env.lookup(this.name);
 		const t = this.materializeTypeOf(m, env);
 		if (vDef && vDef.form) {
@@ -197,7 +211,7 @@ class Id extends Form {
 			if (vDef.type instanceof type.Polymorphic) {
 				// It is polymorphic; return an mangled result
 				// idTyping.instanceAssignments is always present
-				let m1 = new Map();
+				let m1 = new Map(m);
 				for (let [k, v] of idTyping.instanceAssignments) {
 					const v1 = v.applySub(env.typeslots).applySub(m);
 					if (!v1.isClosed()) {
@@ -210,7 +224,7 @@ class Id extends Form {
 				return n;
 			} else {
 				// It is monomorphic; Materialize its content and return
-				let n = vDef.materialize(this.name, null, new Map());
+				let n = vDef.materialize(this.name, null, m);
 				n.typing = t;
 				return n;
 			}
@@ -270,14 +284,14 @@ class Apply extends Form {
 		this.typing = new TypeAssignment(tresult, null);
 		return tresult;
 	}
-	inspect() {
+	inspect(depth) {
 		if (!(this.argument instanceof Id)) {
-			return this.fn.inspect() + " (" + this.argument.inspect() + ")";
+			return this.fn.inspect(depth) + " (" + this.argument.inspect(depth) + ")";
 		} else {
-			return this.fn.inspect() + " " + this.argument.inspect();
+			return this.fn.inspect(depth) + " " + this.argument.inspect(depth);
 		}
 	}
-	materialize(m, env) {
+	_materialize(m, env) {
 		let n = new Apply(this.fn.materialize(m, env), this.argument.materialize(m, env));
 		n.typing = new TypeAssignment(this.materializeTypeOf(m, env));
 		return n;
@@ -305,10 +319,10 @@ class Abstraction extends Form {
 		this.derivedEnv = e;
 		return fnType;
 	}
-	inspect() {
-		return "\\" + this.parameter.inspect() + ". " + this.body.inspect();
+	inspect(depth) {
+		return "\\" + this.parameter.inspect(depth) + ". " + this.body.inspect(depth);
 	}
-	materialize(m, env) {
+	_materialize(m, env) {
 		let n = new Abstraction(
 			this.parameter.materialize(m, this.derivedEnv),
 			this.body.materialize(m, this.derivedEnv));
@@ -316,111 +330,128 @@ class Abstraction extends Form {
 		return n;
 	}
 }
-// Term definition, recursive and polymorphic
-class Definition extends Form {
-	constructor(name, body) {
+
+// Recursive binding of terms. May be polymorphic.
+class Block extends Form {
+	constructor(terms, body) {
 		super();
-		this.name = name;
-		this.argument = body;
-		this.derivedEnv = null;
+		this.terms = terms;
+		this.body = body;
+		this.e1 = null;
+		this.e2 = null;
 	}
 	inference(env) {
 		// Infering definitions ALLOW usage of polymorphism.
-		const e = new Environment(env);
-		const alpha = newtype("D");
-		e.setVariable(this.name, alpha, null);
-		let argtype = this.argument.inference(e).applySub(e.typeslots);
+		const e1 = new Environment(env);
+		const e2 = new Environment(env);
 
-		// Check whether *argtype* is compatible with *forwardDef.type*
-		let forwardDef = env.lookup(this.name);
-		if (forwardDef && env === forwardDef.defenv) {
-			let forwardType = forwardDef.type;
-			let declaredType = forwardType;
-			if (forwardType instanceof type.Polymorphic) {
-				forwardType = forwardType.instance(newtype).type;
+		// Pass 1: Grab all forward declarations
+		let fwdTypes = new Map();
+		for (let term of this.terms) {
+			const name = term.name;
+			const alpha = newtype("D");
+			e1.setVariable(name, alpha, null);
+
+			if (term.declareType) {
+				fwdTypes.set(name, term.declareType);
 			}
-			if (!type.unify(env.typeslots, argtype, forwardType)) {
-				throw new TypeIncompatibleError(this.argument, declaredType, argtype, this);
-			}
-			argtype = argtype.applySub(env.typeslots); // apply substitutions produced by *unify*
 		}
 
-		let freeSlots = new Set();
-		argtype.getFreeSlots(e.typeslots, freeSlots); // grab the free slots of argtype
-		if (freeSlots.size) { // argtype is polymorphic
-			let polytype = new type.Polymorphic(freeSlots, argtype);
+		// Pass 2: Inference all bindings
+		let decisions = [];
+		for (let term of this.terms) {
+			const name = term.name;
+			const form = term.form;
+			if (!form) continue;
+			let argtype = form.inference(e1).applySub(e1.typeslots);
 
-			env.setVariable(this.name, polytype, this.argument, env);
-			const rettype = polytype.instance(newtype).type;
-			this.typing = new TypeAssignment(rettype);
-			this.derivedEnv = e;
-			return rettype;
-		} else { // argtype is monomorphic
-			env.setVariable(this.name, argtype, this.argument, env);
-			this.typing = new TypeAssignment(argtype);
-			this.derivedEnv = e;
-			return argtype;
+			if (fwdTypes.has(name)) {
+				let forwardType = fwdTypes.get(name);
+				let decType = forwardType;
+				if (forwardType instanceof type.Polymorphic) {
+					forwardType = forwardType.instance(newtype).type;
+				}
+				if (!type.unify(e1.typeslots, argtype, forwardType)) {
+					throw new TypeIncompatibleError(form, decType, argtype, this);
+				}
+				argtype = argtype.applySub(e1.typeslots); // apply substitutions produced by *unify*
+			}
+
+			decisions.push({
+				name: name,
+				form: form,
+				argtype: argtype
+			});
 		}
+
+		// Pass 3: Decide the type of each binding
+		let existingFreeSlots = new Set();
+		for (let [k, v] of env.names()) {
+			if (v.type instanceof type.Polymorphic) continue;
+			v.type.applySub(env.typeslots).getFreeSlots(env.typeslots, existingFreeSlots);
+		}
+
+		for (let {name, form, argtype} of decisions) {
+			let freeSlots = new Set();
+			argtype.getFreeSlots(e1.typeslots, freeSlots); // grab the free slots of argtype
+
+			for (let s of existingFreeSlots) {
+				freeSlots.delete(s);
+			}
+
+			if (freeSlots.size) { // argtype is polymorphic
+				let polytype = new type.Polymorphic(freeSlots, argtype);
+				e2.setVariable(name, polytype, form, e1);
+			} else { // argtype is monomorphic
+				e2.setVariable(name, argtype, form, e1);
+			}
+		}
+
+		this.terms = this.terms.filter(x => !!x.form);
+		const t = this.body.inference(e2);
+		this.typing = new TypeAssignment(t);
+		this.e1 = e1;
+		this.e2 = e2;
+		return t;
 	}
-	inspect() {
-		return "define ".yellow + this.name + " = " + this.argument.inspect();
+	inspect(depth) {
+		return "let rec ".yellow
+		+ "\n" + "  ".repeat(depth - 1)
+		+ this.terms.map(
+			(x) => x.form
+				? util.inspect(x.name) + " = " + x.form.inspect(depth + 1)
+				: ""
+		).join(";\n" + "  ".repeat(depth - 1))
+		+ "\n" + "  ".repeat(depth - 1) + "in ".yellow + this.body.inspect(depth);
 	}
-	materialize(m, env) {
-		let n = new Definition(this.name, this.argument.materialize(m, this.derivedEnv));
+	_materialize(m, env) {
+		let terms1 = [];
+		for (let {name, form} of this.terms) {
+			let vd = this.e2.lookup(name);
+			if (!(vd.type instanceof type.Polymorphic)) {
+				terms1.push({
+					name: name,
+					form: form.materialize(m, this.e1)
+				});
+			}
+		}
+		let n = new Block(terms1, this.body.materialize(m, this.e2));
 		n.typing = new TypeAssignment(this.materializeTypeOf(m, env));
+		for (let {name, form} of this.terms) {
+			let vd = this.e2.lookup(name);
+			if (!vd || !vd.materialized.size) continue;
+			for (let [mangler, f] of vd.materialized.entries()) {
+				if (!mangler) continue;
+				terms1.push({
+					name: new MangledId(name, mangler),
+					form: f
+				});
+			}
+		}
 		return n;
 	}
 }
 
-// Plain assignment, monomorphic
-class Assign extends Form {
-	constructor(name, p) {
-		super();
-		this.name = name;
-		this.argument = p;
-	}
-	inference(env) {
-		const argtype = this.argument.inference(env);
-		env.setVariable(this.name, argtype, null);
-		this.typing = new TypeAssignment(argtype);
-		return argtype;
-	}
-	inspect() {
-		return "set ".yellow + this.name + " = " + this.argument.inspect();
-	}
-	materialize(m, env) {
-		let n = new Assign(this.name, this.argument.materialize(m, env));
-		n.typing = new TypeAssignment(this.materializeTypeOf(m, env));
-		return n;
-	}
-}
-// Recursive assignment, monomorphic
-class AssignRec extends Form {
-	constructor(name, p) {
-		super();
-		this.name = name;
-		this.argument = p;
-		this.derivedEnv = null;
-	}
-	inference(env) {
-		const e = new Environment(env);
-		const alpha = newtype("D");
-		e.setVariable(this.name, alpha, null);
-		const argtype = this.argument.inference(e);
-		env.setVariable(this.name, argtype, null);
-		this.typing = new TypeAssignment(argtype);
-		this.derivedEnv = e;
-		return argtype;
-	}
-	inspect() {
-		return "set rec ".yellow + this.name + " = " + this.argument.inspect();
-	}
-	materialize(m, env) {
-		let n = new Assign(this.name, this.argument.materialize(m, this.derivedEnv));
-		n.typing = new TypeAssignment(this.materializeTypeOf(m, env));
-		return n;
-	}
-}
 // Special node, Native
 class Native extends Form {
 	constructor(name) {
@@ -430,7 +461,7 @@ class Native extends Form {
 	inspect() {
 		return "[native " + this.name + "]";
 	}
-	materialize(m, env) {
+	_materialize(m, env) {
 		return new Native(this.name);
 	}
 }
@@ -453,20 +484,32 @@ function translateType(a) {
 		return type.prim(a);
 	}
 }
+function translateBinding(x) {
+	if (x[0] === "::") {
+		return {
+			name: x[1],
+			declareType: translateType(x[2])
+		};
+	} else if (x.length === 2) {
+		return {
+			name: x[0],
+			form: translate(x[1])
+		};
+	} else {
+		return {
+			name: x[0],
+			form: translate(["lambda"].concat(x.slice(1)))
+		};
+	}
+}
 function translate(a) {
 	if (a instanceof Array) {
 		if (a[0] === "declare") {
 			return new ForwardDeclaration(a[1], translateType(a[2]));
 		} else if (a[0] === "::") {
 			return new Limitation(translate(a[1]), translateType(a[2]));
-		} else if (a[0] === "define" && a.length === 3) {
-			return new Definition(a[1], translate(a[2]));
-		} else if (a[0] === "define") {
-			return new Definition(a[1], translate(["lambda"].concat(a.slice(2))));
-		} else if (a[0] === "let" && a.length === 3) {
-			return new Assign(a[1], translate(a[2]));
-		} else if (a[0] === "letf" && a.length === 4) {
-			return new AssignRec(a[1], new Abstraction(translate(a[2]), translate(a[3])));
+		} else if (a[0] === "let") {
+			return new Block(a.slice(1, -1).map(translateBinding), translate(a[a.length - 1]));
 		} else if (a[0] === "lambda" && a.length >= 3) {
 			const fn0 = translate(a[a.length - 1]);
 			return a.slice(1, -1).reduceRight((fn, term) => new Abstraction(translate(term), fn), fn0);

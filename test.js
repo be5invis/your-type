@@ -1,6 +1,7 @@
 const inference = require("./inference");
 const type = require("./type");
 
+
 const program = [
 	["declare", "seq", ["forall", "'a", "'b", ["->", "'a", ["->", "'b", "'b"]]]],
 	["declare", "car", ["forall", "'a", ["->", ["list", "'a"], "'a"]]],
@@ -28,57 +29,73 @@ const program = [
 	["declare", "not", ["->", "bool", "bool"]],
 	["declare", "odd?", ["->", "int", "bool"]],
 	["declare", "even?", ["->", "int", "bool"]],
-	["define", "odd?", "x", ["if", ["==", "x", "0"],
-		["then", "false"],
-		["else", ["even?", ["-", "x", "1"]]]]],
-	["define", "even?", "x", ["if", ["==", "x", "0"],
-		["then", "true"],
-		["else", ["odd?", ["-", "x", "1"]]]]],
+
+	// ["define", "odd?", "x", ["if", ["==", "x", "0"],
+	// 	["then", "false"],
+	// 	["else", ["even?", ["-", "x", "1"]]]]],
+	// ["define", "even?", "x", ["if", ["==", "x", "0"],
+	// 	["then", "true"],
+	// 	["else", ["odd?", ["-", "x", "1"]]]]],
 
 	["declare", "id", ["forall", "'a", ["->", "'a", "'a"]]],
-	["define", "id", "a", "a"],
+	// ["define", "id", "a", "a"],
 	["declare", "id_i", ["->", "int", "int"]],
-	["define", "id_i", "a", "a"],
+	// ["define", "id_i", "a", "a"],
 	["declare", "id_narrow", ["forall", "'a", ["->", "'a", "'a"]]],
-	["define", "id_narrow", "a", ["id_i", "a"]],
+	// ["define", "id_narrow", "a", ["id_i", "a"]],
 
-	["define", "length", "a",
-		["if", ["empty?", "a"],
-			["then", "0"],
-			["else", ["+", "1", ["length", ["cdr", "a"]]]]]],
-	["define", "sum", "a",
-		["if", ["empty?", "a"],
-			["then", "0"],
-			["else", ["+", ["car", "a"], ["sum", ["cdr", "a"]]]]]],
-	["declare", "map", ["forall", "'k", "'a", "'b",
-		["->", ["->", "'a", "'b"],
-			["->", ["'k", "'a"], ["'k", "'b"]]]]],
-	["define", "map", "f", "a",
-		["if", ["empty?", "a"],
-			["then", ["newlist", "nothing"]],
-			["else", ["begin",
-				["let", "head", ["f", ["car", "a"]]],
-				["let", "rear", ["map", "f", ["cdr", "a"]]],
-				["cons", "head", "rear"]]]]],
-	["declare", "+?", ["forall", "'a", "'b", "'c",
-		["->", "'a", ["->", "'b", "'c"]]]],
-	["define", "main",
+	// ["define", "length", "a",
+	// 	["if", ["empty?", "a"],
+	// 		["then", "0"],
+	// 		["else", ["+", "1", ["length", ["cdr", "a"]]]]]],
+	// ["define", "sum", "a",
+	// 	["if", ["empty?", "a"],
+	// 		["then", "0"],
+	// 		["else", ["+", ["car", "a"], ["sum", ["cdr", "a"]]]]]],
+	// ["declare", "map", ["forall", "'k", "'a", "'b",
+	// 	["->", ["->", "'a", "'b"],
+	// 		["->", ["'k", "'a"], ["'k", "'b"]]]]],
+	// ["define", "map", "f", "a",
+	// 	["if", ["empty?", "a"],
+	// 		["then", ["newlist", "nothing"]],
+	// 		["else", ["begin",
+	// 			["define", "head", ["f", ["car", "a"]]],
+	// 			["define", "rear", ["map", "f", ["cdr", "a"]]],
+	// 			["cons", "head", "rear"]]]]],
+	// ["declare", "+?", ["forall", "'a", "'b", "'c",
+	// 	["->", "'a", ["->", "'b", "'c"]]]],
+	// ["define", "main",
+	// 	["begin",
+	// 		["define", "f", "x", "x"],
+	// 		["f", "0"],
+	// 		["f", "nothing"],
+	// 		["map", ["lambda", "x", "x"], ["cons", "nothing", ["newlist", "nothing"]]]]]
+	["let",
+		["idx", "x", "x"],
+		["::", "map", ["forall", "'k", "'a", "'b",
+			["->", ["->", "'a", "'b"],
+				["->", ["'k", "'a"], ["'k", "'b"]]]]],
+		["map", "f", "a",
+			["if", ["empty?", "a"],
+				["then", ["newlist", "nothing"]],
+				["else", ["let",
+					["head", ["f", ["car", "a"]]],
+					["rear", ["map", "f", ["cdr", "a"]]],
+					["cons", "head", "rear"]]]]],
+		["2", ["+", "1", "1"]],
 		["begin",
-			["even?", "1"],
-			["id", "id", "id", "id", "0"],
-			["::", "map", ["->", ["->", "int", "int"], ["->", ["list", "int"], ["list", "int"]]]],
-			["::",
-				["map", ["lambda", "x", ["+?", "x", "1"]], ["cons", "0", ["newlist", "nothing"]]],
-				["list", "int"]],
-			["sum", ["cons", "0", ["newlist", "nothing"]]],
+			["idx", "1"],
+			["idx", "nothing"],
 			["map", ["lambda", "x", "x"], ["cons", "nothing", ["newlist", "nothing"]]]]]
 ];
-
+const forms = program.map(inference.translate);
 const env = new inference.Environment(null);
-program.forEach(p => inference.translate(p).inference(env));
-const f_main_mat = env.variables.get("main").form.materialize(new Map(), env);
-env.variables.get("main").form = f_main_mat;
-
+forms.forEach(p => p.inference(env));
+const maindef = env.variables.get("main");
+const f_main_mat = forms[forms.length - 1].materialize(new Map(), env);
+const matform = f_main_mat;
+console.log(matform);
+/*
 for (let [k, v] of env.variables.entries()) {
 	if (!(v.type instanceof type.Polymorphic)) {
 		if (v.form) {
@@ -96,3 +113,4 @@ for (let [k, v] of env.variables.entries()) {
 		}
 	}
 }
+*/
