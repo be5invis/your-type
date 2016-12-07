@@ -419,7 +419,7 @@ class Block extends Form {
 		+ "\n" + "  ".repeat(depth - 1)
 		+ this.terms.map(
 			(x) => x.form
-				? util.inspect(x.name) + " = " + x.form.inspect(depth + 1)
+				? util.inspect(x.name) + " = ".green + x.form.inspect(depth + 1)
 				: ""
 		).join(";\n" + "  ".repeat(depth - 1))
 		+ "\n" + "  ".repeat(depth - 1) + "in ".yellow + this.body.inspect(depth);
