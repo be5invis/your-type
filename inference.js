@@ -297,45 +297,31 @@ class Definition extends Form {
 		e.setVariable(this.name, alpha, null);
 		let argtype = this.argument.inference(e).applySub(e.typeslots);
 
+		// Check whether *argtype* is compatible with *forwardDef.type*
+		let forwardDef = env.lookup(this.name);
+		if (forwardDef && env === forwardDef.defenv) {
+			let forwardType = forwardDef.type;
+			let declaredType = forwardType;
+			if (forwardType instanceof type.Polymorphic) {
+				forwardType = forwardType.instance(newtype).type;
+			}
+			if (!type.unify(env.typeslots, argtype, forwardType)) {
+				throw new TypeIncompatibleError(this.argument, declaredType, argtype, this);
+			}
+			argtype = argtype.applySub(env.typeslots); // apply substitutions produced by *unify*
+		}
+
 		let freeSlots = new Set();
 		argtype.getFreeSlots(e.typeslots, freeSlots); // grab the free slots of argtype
 		if (freeSlots.size) { // argtype is polymorphic
 			let polytype = new type.Polymorphic(freeSlots, argtype);
-
-			// Check whether *argtype* is compatible with *forwardDef.type*
-			let forwardDef = env.lookup(this.name);
-			if (forwardDef && env === forwardDef.defenv) {
-				let forwardType = forwardDef.type;
-				if (!(forwardType instanceof type.Polymorphic) // the declared type is polymorphic
-					|| forwardType.quantifier.size !== freeSlots.size // they share the same quantity of quantifiers
-					|| !type.unify(env.typeslots, argtype, forwardType.instance(newtype).type)) { // and compatible
-					throw new TypeIncompatibleError(this.argument, forwardType, argtype, this);
-				}
-				// If check, rebuild the polymorphic type *polytype*
-				argtype = argtype.applySub(env.typeslots); // apply substitutions produced by *unify*
-				freeSlots = new Set();
-				argtype.getFreeSlots(e.typeslots, freeSlots);
-				polytype = new type.Polymorphic(freeSlots, argtype);
-			}
 
 			env.setVariable(this.name, polytype, this.argument, env);
 			const rettype = polytype.instance(newtype).type;
 			this.typing = new TypeAssignment(rettype);
 			this.derivedEnv = e;
 			return rettype;
-		} else {
-			// argtype is monomorphic
-			// Check whether *argtype* is compatible with *forwardDef.type*
-			let forwardDef = env.lookup(this.name);
-			if (forwardDef && env === forwardDef.defenv) {
-				let forwardType = forwardDef.type;
-				if (forwardType instanceof type.Polymorphic // the declared type is monomorphic
-					|| !type.unify(env.typeslots, argtype, forwardType)) { // and compatible
-					throw new TypeIncompatibleError(this.argument, forwardType, argtype, this);
-				}
-				argtype = argtype.applySub(env.typeslots); // apply substitutions produced by *unify*
-			}
-
+		} else { // argtype is monomorphic
 			env.setVariable(this.name, argtype, this.argument, env);
 			this.typing = new TypeAssignment(argtype);
 			this.derivedEnv = e;
@@ -498,6 +484,11 @@ const program = [
 
 	["declare", "id", ["forall", "'a", ["->", "'a", "'a"]]],
 	["define", "id", "a", "a"],
+	["declare", "id_i", ["->", "int", "int"]],
+	["define", "id_i", "a", "a"],
+	["declare", "id_narrow", ["forall", "'a", ["->", "'a", "'a"]]],
+	["define", "id_narrow", "a", ["id_i", "a"]],
+
 	["define", "length", "a",
 		["if", ["empty?", "a"],
 			["then", "0"],
