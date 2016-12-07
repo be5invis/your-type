@@ -99,6 +99,7 @@ class Form {
 		this.typing = null;
 	}
 	inspect() {}
+	inference() {}
 	materialize(m, env) {}
 	materializeTypeOf(m, env) {
 		if (!this.typing) {
@@ -112,6 +113,20 @@ class Form {
 			throw new Error(`The type of <${util.inspect(this)}> is not closed: ${util.inspect(t)} .`);
 		}
 		return t;
+	}
+}
+// Forward declaration
+class ForwardDeclaration {
+	constructor(name, type) {
+		this.name = name;
+		this.type = type;
+	}
+	inspect() {
+		return this.name + "::" + this.type.inspect();
+	}
+	inference(env) {
+		env.setVariable(this.name, this.type, new Native(this.name), env);
+		return type.prim("unit");
 	}
 }
 // Identifier
@@ -280,17 +295,47 @@ class Definition extends Form {
 		const e = new Environment(env);
 		const alpha = newtype("D");
 		e.setVariable(this.name, alpha, null);
-		const argtype = this.argument.inference(e).applySub(e.typeslots);
-		const fsm = new Set();
-		argtype.getFreeSlots(e.typeslots, fsm);
-		if (fsm.size) {
-			const polytype = new type.Polymorphic(fsm, argtype);
+		let argtype = this.argument.inference(e).applySub(e.typeslots);
+
+		let freeSlots = new Set();
+		argtype.getFreeSlots(e.typeslots, freeSlots); // grab the free slots of argtype
+		if (freeSlots.size) { // argtype is polymorphic
+			let polytype = new type.Polymorphic(freeSlots, argtype);
+
+			// Check whether *argtype* is compatible with *forwardDef.type*
+			let forwardDef = env.lookup(this.name);
+			if (forwardDef && env === forwardDef.defenv) {
+				let forwardType = forwardDef.type;
+				if (!(forwardType instanceof type.Polymorphic) // the declared type is polymorphic
+					|| forwardType.quantifier.size !== freeSlots.size // they share the same quantity of quantifiers
+					|| !type.unify(env.typeslots, argtype, forwardType.instance(newtype).type)) { // and compatible
+					throw new TypeIncompatibleError(this.argument, forwardType, argtype, this);
+				}
+				// If check, rebuild the polymorphic type *polytype*
+				argtype = argtype.applySub(env.typeslots); // apply substitutions produced by *unify*
+				freeSlots = new Set();
+				argtype.getFreeSlots(e.typeslots, freeSlots);
+				polytype = new type.Polymorphic(freeSlots, argtype);
+			}
+
 			env.setVariable(this.name, polytype, this.argument, env);
 			const rettype = polytype.instance(newtype).type;
 			this.typing = new TypeAssignment(rettype);
 			this.derivedEnv = e;
 			return rettype;
 		} else {
+			// argtype is monomorphic
+			// Check whether *argtype* is compatible with *forwardDef.type*
+			let forwardDef = env.lookup(this.name);
+			if (forwardDef && env === forwardDef.defenv) {
+				let forwardType = forwardDef.type;
+				if (forwardType instanceof type.Polymorphic // the declared type is monomorphic
+					|| !type.unify(env.typeslots, argtype, forwardType)) { // and compatible
+					throw new TypeIncompatibleError(this.argument, forwardType, argtype, this);
+				}
+				argtype = argtype.applySub(env.typeslots); // apply substitutions produced by *unify*
+			}
+
 			env.setVariable(this.name, argtype, this.argument, env);
 			this.typing = new TypeAssignment(argtype);
 			this.derivedEnv = e;
@@ -315,10 +360,10 @@ class Assign extends Form {
 		this.argument = p;
 	}
 	inference(env) {
-		const t = this.argument.inference(env);
-		env.setVariable(this.name, t, null);
-		this.typing = new TypeAssignment(t);
-		return t;
+		const argtype = this.argument.inference(env);
+		env.setVariable(this.name, argtype, null);
+		this.typing = new TypeAssignment(argtype);
+		return argtype;
 	}
 	inspect() {
 		return "set ".yellow + this.name + " = " + this.argument.inspect();
@@ -341,11 +386,11 @@ class AssignRec extends Form {
 		const e = new Environment(env);
 		const alpha = newtype("D");
 		e.setVariable(this.name, alpha, null);
-		const t = this.argument.inference(e);
-		env.setVariable(this.name, t, null);
-		this.typing = new TypeAssignment(t);
+		const argtype = this.argument.inference(e);
+		env.setVariable(this.name, argtype, null);
+		this.typing = new TypeAssignment(argtype);
 		this.derivedEnv = e;
-		return t;
+		return argtype;
 	}
 	inspect() {
 		return "set rec ".yellow + this.name + " = " + this.argument.inspect();
@@ -371,104 +416,31 @@ class Native extends Form {
 }
 
 const env = new Environment(null);
-// This is a prelude
-// call : forall a b. (a -> b) -> a -> b;
-env.setVariable("call",
-	new type.Polymorphic(
-		new Set([type.slot("a"), type.slot("b")]),
-		type.arrow(type.arrow(type.slot("a"), type.slot("b")), type.arrow(type.slot("a"), type.slot("b")))
-	),
-	new Native("call"),
-	env);
-// seq : forall a b. a -> b -> b
-env.setVariable("seq",
-	new type.Polymorphic(
-		new Set([type.slot("a"), type.slot("b")]),
-		type.arrow(type.slot("a"), type.arrow(type.slot("b"), type.slot("b")))
-	),
-	new Native("seq"),
-	env);
-// car : forall a. list a -> a
-env.setVariable("car",
-	new type.Polymorphic(
-		new Set([type.slot("a")]),
-		type.arrow(type.cmpt(type.prim("list"), type.slot("a")), type.slot("a"))
-	),
-	new Native("car"),
-	env);
-// cdr : forall a. list a -> list a
-env.setVariable("cdr",
-	new type.Polymorphic(
-		new Set([type.slot("a")]),
-		type.arrow(type.cmpt(type.prim("list"), type.slot("a")), type.cmpt(type.prim("list"), type.slot("a")))
-	),
-	new Native("cdr"),
-	env);
-// cons : forall a. a -> list a -> list a
-env.setVariable("cons",
-	new type.Polymorphic(
-		new Set([type.slot("a")]),
-		type.arrow(
-			type.slot("a"),
-			type.arrow(
-				type.cmpt(type.prim("list"), type.slot("a")),
-				type.cmpt(type.prim("list"), type.slot("a"))))
-	),
-	new Native("cons"),
-	env);
-// newlist : forall a. unit -> list a
-env.setVariable("newlist",
-	new type.Polymorphic(
-		new Set([type.slot("a")]),
-		type.arrow(
-			type.prim("unit"),
-			type.cmpt(type.prim("list"), type.slot("a")))
-	),
-	new Native("newlist"),
-	env);
-// empty? : forall a. list a -> bool
-env.setVariable("empty?",
-	new type.Polymorphic(
-		new Set([type.slot("a")]),
-		type.arrow(type.cmpt(type.prim("list"), type.slot("a")), type.prim("bool"))
-	),
-	new Native("empty?"),
-	env);
-// 0 and 1
-env.setVariable("0", type.prim("int"));
-env.setVariable("1", type.prim("int"));
-env.setVariable("nothing", type.prim("unit"));
-// +
-env.setVariable("+",
-	new type.Polymorphic(
-		new Set([type.slot("a"), type.slot("b")]),
-		type.arrow(
-			type.slot("a"),
-			type.arrow(type.slot("b"), type.slot("b")))),
-	new Native("+"),
-	env);
-// if : forall a. bool -> thunk a -> thunk a -> a
-env.setVariable("if",
-	new type.Polymorphic(
-		new Set([type.slot("a")]),
-		type.arrow(type.prim("bool"),
-			type.arrow(type.cmpt(type.prim("thunk"), type.slot("a")),
-				type.arrow(type.cmpt(type.prim("thunk"), type.slot("a")), type.slot("a"))))),
-	new Native("if"),
-	env);
-// hold : forall a. a -> thunk a
-env.setVariable("hold",
-	new type.Polymorphic(
-		new Set([type.slot("a")]),
-		type.arrow(type.slot("a"),
-			type.cmpt(type.prim("thunk"), type.slot("a")))),
-	new Native("hold"),
-	env);
 
+function translateType(a) {
+	if (a instanceof Array) {
+		if (a[0] === "forall") {
+			return new type.Polymorphic(
+				new Set(a.slice(1, -1).map(translateType)),
+				translateType(a[a.length - 1])
+			);
+		} else if (a.length === 2) {
+			return new type.cmpt(translateType(a[0]), translateType(a[1]));
+		} else {
+			return new type.cmpt(translateType(a.slice(0, -1)), translateType(a[a.length - 1]));
+		}
+	} else if (a[0] === "'") {
+		return type.slot(a.slice(1));
+	} else {
+		return type.prim(a);
+	}
+}
 function translate(a) {
 	if (a instanceof Array) {
 		if (a[0] === "define" && a.length === 3) {
 			return new Definition(a[1], translate(a[2]));
+		} else if (a[0] === "declare") {
+			return new ForwardDeclaration(a[1], translateType(a[2]));
 		} else if (a[0] === "define") {
 			return new Definition(a[1], translate(["lambda"].concat(a.slice(2))));
 		} else if (a[0] === "let" && a.length === 3) {
@@ -490,43 +462,69 @@ function translate(a) {
 	}
 }
 
-const f_id = translate(
-	["define", "id", "a", "a"]);
-const f_length = translate(
+const program = [
+	["declare", "seq", ["forall", "'a", "'b", ["->", "'a", ["->", "'b", "'b"]]]],
+	["declare", "car", ["forall", "'a", ["->", ["list", "'a"], "'a"]]],
+	["declare", "cdr", ["forall", "'a", ["->", ["list", "'a"], ["list", "'a"]]]],
+	["declare", "cons", ["forall", "'a", ["->", "'a", ["->", ["list", "'a"], ["list", "'a"]]]]],
+	["declare", "newlist", ["forall", "'a", ["->", "unit", ["list", "'a"]]]],
+	["declare", "empty?", ["forall", "'a", ["->", ["list", "'a"], "bool"]]],
+	["declare", "0", "int"],
+	["declare", "1", "int"],
+	["declare", "true", "bool"],
+	["declare", "false", "bool"],
+	["declare", "nothing", "unit"],
+	["declare", "+", ["forall", "'a",
+		["->", "'a", ["->", "'a", "'a"]]]],
+	["declare", "-", ["forall", "'a",
+		["->", "'a", ["->", "'a", "'a"]]]],
+	["declare", "==", ["forall", "'a",
+		["->", "'a", ["->", "'a", "bool"]]]],
+	["declare", "if", ["forall", "'a",
+		["->", "bool",
+			["->", ["thunk", "'a"],
+				["->", ["thunk", "'a"], "'a"]]]]],
+	["declare", "then", ["forall", "'a", ["->", "'a", ["thunk", "'a"]]]],
+	["declare", "else", ["forall", "'a", ["->", "'a", ["thunk", "'a"]]]],
+	["declare", "not", ["->", "bool", "bool"]],
+	["declare", "odd?", ["->", "int", "bool"]],
+	["declare", "even?", ["->", "int", "bool"]],
+	["define", "odd?", "x", ["if", ["==", "x", "0"],
+		["then", "false"],
+		["else", ["not", ["even?", ["-", "x", "1"]]]]]],
+	["define", "even?", "x", ["if", ["==", "x", "0"],
+		["then", "true"],
+		["else", ["not", ["odd?", ["-", "x", "1"]]]]]],
+
+	["declare", "id", ["forall", "'a", ["->", "'a", "'a"]]],
+	["define", "id", "a", "a"],
 	["define", "length", "a",
 		["if", ["empty?", "a"],
-			["hold", "0"],
-			["hold", ["+", "1", ["length", ["cdr", "a"]]]]]]);
-const f_sum = translate(
+			["then", "0"],
+			["else", ["+", "1", ["length", ["cdr", "a"]]]]]],
 	["define", "sum", "a",
 		["if", ["empty?", "a"],
-			["hold", "0"],
-			["hold", ["+", ["car", "a"], ["sum", ["cdr", "a"]]]]]]);
-const f_map = translate(
+			["then", "0"],
+			["else", ["+", ["car", "a"], ["sum", ["cdr", "a"]]]]]],
 	["define", "map", "f", "a",
 		["if", ["empty?", "a"],
-			["hold", ["newlist", "nothing"]],
-			["hold", ["begin",
+			["then", ["newlist", "nothing"]],
+			["else", ["begin",
 				["let", "head", ["f", ["car", "a"]]],
 				["let", "rear", ["map", "f", ["cdr", "a"]]],
-				["cons", "head", "rear"]]]]]);
-
-
-const f_main = translate(
+				["cons", "head", "rear"]]]]],
 	["define", "main",
 		["begin",
+			["even?", "1"],
 			["id", "id", "id", "id", "0"],
 			["map", ["lambda", "x", ["+", "x", "1"]], ["cons", "0", ["newlist", "nothing"]]],
 			["sum", ["cons", "0", ["newlist", "nothing"]]],
-			["map", ["lambda", "x", "x"], ["cons", "nothing", ["newlist", "nothing"]]]]]);
+			["map", ["lambda", "x", "x"], ["cons", "nothing", ["newlist", "nothing"]]]]]
+];
 
-f_id.inference(env);
-f_length.inference(env);
-f_sum.inference(env);
-f_map.inference(env);
-f_main.inference(env);
+program.forEach(p => translate(p).inference(env));
 
-const f_main_mat = f_main.materialize(new Map(), env);
+const f_main_mat = env.variables.get("main").form.materialize(new Map(), env);
 env.variables.get("main").form = f_main_mat;
 
 for (let [k, v] of env.variables.entries()) {

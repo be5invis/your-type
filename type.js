@@ -154,6 +154,9 @@ class Polymorphic {
 			variables: m
 		};
 	}
+	applySub(m) {
+		return new Polymorphic(this.quantifier, this.base.applySub(m));
+	}
 }
 
 // Unify two monomorphic types, p and q with slot mapping m.
