@@ -64,9 +64,11 @@ class Ann extends Term {
 // //// TYPES
 class Type {
 	constructor() {}
-	// Get all meta type variables.
-	// a : Map id MetaTv
-	// default: pass
+
+	/**
+	 * Get all meta type variables.
+	 * @returns {Map<string, Type>}
+	 */
 	getMetaSlots() {
 		let a = new Map;
 		this._getMetaSlots(a);
@@ -89,21 +91,36 @@ class Type {
 		return a;
 	}
 	_getBinders() {}
-	// Substitute type variables to a corresponded type.
-	// m : Map String Type
+	/**
+	 * Substitute type variables to a corresponded type.
+	 * @param {Map<string, Type>} m
+	 * @returns {Type}
+	 */
 	subst(m) {
 		return this;
 	}
-	// Instantiation
-	// Instantiate the topmost for-alls of the argument type with flexible type variables
+	/**
+	 * Instantiate the topmost for-alls of the argument type with flexible type variables
+	 * @param {Environment} env
+	 * @returns {Type}
+	 */
 	instantiate(env) {
 		return this;
 	}
-	// Performs deep skolemisation, retuning the skolem constants and the skolemised type
+	/**
+	 * Performs deep skolemisation, retuning the skolem constants and the skolemised type
+	 * @param {Environment} env
+	 * @returns {Type}
+	 */
 	skolemise(env) {
 		return this;
 	}
-	// Quantify over the specified type variables (all flexible)
+	/**
+	 * Quantify over the specified type variables
+	 * @param {Environment} env
+	 * @param {Array<MetaSlotVal>} mvs
+	 * @returns {Type}
+	 */
 	quantify(env, mvs) {
 		let usedBinders = this.getBinders();
 		let nRef = {val: 0};
@@ -115,8 +132,11 @@ class Type {
 		}
 		return new ForAll(newBinders, this.zonk(env));
 	}
-	// Zonking
-	// Eliminate any substitutions in the type
+	/**
+	 * Eliminate any substitutions in the type
+	 * @param {Environment} env
+	 * @returns {Type}
+	 */
 	zonk(env) {
 		return this;
 	}
@@ -134,6 +154,10 @@ function generateBinder(nRef, used) {
 }
 
 class ForAll extends Type {
+	/**
+	 * @param {Array<string>} quantifiers
+	 * @param {Type} body
+	 */
 	constructor(quantifiers, body) {
 		super();
 		this.quantifiers = quantifiers;
@@ -164,14 +188,14 @@ class ForAll extends Type {
 	}
 	instantiate(env) {
 		let m = new Map();
-		for (let q of type.quantifiers) {
+		for (let q of this.quantifiers) {
 			m.set(q, new MetaSlot(env.newMetaSlotVal()));
 		}
 		return this.body.subst(m);
 	}
 	skolemise(env) {
 		let m = new Map();
-		for (let q of type.quantifiers) {
+		for (let q of this.quantifiers) {
 			m.set(q, new Slot(env.newSkolemVariable()));
 		}
 		let {map: m1, type: t1} = skolemise(env, this.body.subst(m));
@@ -189,12 +213,18 @@ class ForAll extends Type {
 	}
 }
 class Primitive extends Type {
+	/**
+	 * @param {string} name
+	 */
 	constructor(name) {
 		super();
 		this.name = name;
 	}
 }
 class Slot extends Type {
+	/**
+	 * @param {string} name
+	 */
 	constructor(name) {
 		super();
 		this.name = name;
@@ -213,6 +243,10 @@ class Slot extends Type {
 	}
 }
 class Composite extends Type {
+	/**
+	 * @param {Type} fn
+	 * @param {Type} arg
+	 */
 	constructor(fn, arg) {
 		super();
 		this.fn = fn;
@@ -245,6 +279,9 @@ class Composite extends Type {
 	}
 }
 class MetaSlot extends Type {
+	/**
+	 * @param {MetaSlotVal} arg - Argument
+	 */
 	constructor(arg) {
 		super();
 		this.arg = arg;
@@ -266,6 +303,10 @@ class MetaSlot extends Type {
 }
 // MetaVal -- can unify with any tau-type
 class MetaSlotVal {
+	/**
+	 * @param {number} id
+	 * @param {{val:Type}} typeRef
+	 */
 	constructor(id, typeRef) {
 		this.id = id;
 		this.typeRef = typeRef;
@@ -277,15 +318,28 @@ class MetaSlotVal {
 
 // //// Environments
 class Environment {
+	/**
+	 * @param {{val:number}} uniqs
+	 * @param {Map<string, Type>} variables
+	 */
 	constructor(uniqs, variables) {
 		this.uniqs = uniqs;
 		this.variables = variables;
 	}
+	/**
+	 * Extend a variable
+	 * @param {string} name
+	 * @param {Type} type
+	 */
 	extend(name, type) {
 		let v1 = new Map(this.variables);
 		v1.set(name, type);
 		return new Environment(this.uniqs, this.variables);
 	}
+	/**
+	 * @param {string} name
+	 * @returns {Type}
+	 */
 	lookup(name) {
 		if (this.variables.has(name)) {
 			return this.variables.get(name);
@@ -309,7 +363,11 @@ class Environment {
 }
 
 // ////Unification
-
+/**
+ * @param {Type} t1
+ * @param {Type} t2
+ * @returns {boolean}
+ */
 function unify(t1, t2) {
 	if (badtype(t1) || badtype(t2)) throw "Should not be here."
 	if (t1 instanceof Slot && t2 instanceof Slot && t1.name === t2.name) return true;
@@ -324,7 +382,11 @@ function unify(t1, t2) {
 	if (t1 instanceof Primitive && t2 instanceof Primitive && t1.name === t2.name) {return true;}
 	throw "Cannot unify."
 }
-
+/**
+ * Unify variable
+ * @param {MetaSlotVal} msv
+ * @param {Type} ty
+ */
 function unifyVar(msv, ty) {
 	if (msv.typeRef.val) {
 		return unify(msv.typeRef.val, ty);
@@ -332,7 +394,11 @@ function unifyVar(msv, ty) {
 		return unifyUnbound(msv, ty);
 	}
 }
-
+/**
+ * Unify unbounded type
+ * @param {MetaSlotVal} msv
+ * @param {Type} ty
+ */
 function unifyUnbound(msv, ty) {
 	if (ty instanceof MetaSlot) {
 		let msv2 = ty.arg;
@@ -352,7 +418,10 @@ function unifyUnbound(msv, ty) {
 		}
 	}
 }
-
+/**
+ * @param {Type} t
+ * @returns {boolean}
+ */
 function badtype(t) {
 	return t instanceof Slot && t.name[0] !== ".";
 }
