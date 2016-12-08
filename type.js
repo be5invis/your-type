@@ -227,33 +227,37 @@ class Polymorphic {
 // Unify two monomorphic types, slot mapping m, "desired" s and "actual" t.
 function unify(m, s, t) {
 	if (s instanceof Slot && t instanceof Slot && s.applySub(m).equalTo(t.applySub(m))) {
-		return true;
+		return s;
 	} else if (s instanceof Primitive && t instanceof Primitive && s.name === t.name && s.kind === t.kind) {
-		return true;
+		return s;
 	} else if (s instanceof Composite && t instanceof Composite) {
-		return unify(m, s.ctor, t.ctor) && unify(m, s.argument, t.argument);
+		const ctor1 = unify(m, s.ctor, t.ctor);
+		if (!ctor1) return null;
+		const arg1 = unify(m, s.argument, t.argument);
+		if (!arg1) return null;
+		return new Composite(ctor1, arg1);
 	} else if (s instanceof Slot) {
 		let t1 = t.applySub(m);
 		if (t1.freeFrom(s)) {
-			m.set(s, t1.applySub(m));
-			return true;
+			m.set(s, t1);
+			return t1;
 		} else {
-			return false;
+			return null;
 		}
 	} else if (t instanceof Slot) {
 		let s1 = s.applySub(m);
 		if (s1.freeFrom(t)) {
-			m.set(t, s1.applySub(m));
-			return true;
+			m.set(t, s1);
+			return s1;
 		} else {
-			return false;
+			return null;
 		}
 	} else if (t instanceof Bottom) {
-		return true;
+		return s;
 	} else if (s instanceof Existential) {
-		return true;
+		return s;
 	} else {
-		return false;
+		return null;
 	}
 }
 

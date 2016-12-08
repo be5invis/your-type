@@ -173,9 +173,10 @@ class Limitation extends Form {
 			? this.type.instance(newtype).type
 			: this.type).applySub(env.typeslots);
 		env.setVariable(this.name, this.type, new Native(this.name), env);
-		let t1 = this.argument.inference(env);
 
-		if (!type.unify(env.typeslots, t, t1)) {
+		let t1 = this.argument.inference(env);
+		let t2 = type.unify(env.typeslots, t, t1);
+		if (!t2) {
 			throw new TypeIncompatibleError(
 				this.argument,
 				t.applySub(env.typeslots),
@@ -183,7 +184,7 @@ class Limitation extends Form {
 				this);
 		}
 
-		const tresult = t.applySub(env.typeslots);
+		const tresult = t1.applySub(env.typeslots);
 		this.typing = new TypeAssignment(tresult, null);
 		return tresult;
 	}
@@ -282,12 +283,14 @@ class Apply extends Form {
 		const s = newtype();
 		const t = newtype();
 		const psuidoArrow = type.arrow(s, t);
-		if (!type.unify(env.typeslots, psuidoArrow, tfn)) {
+		const tfn1 = type.unify(env.typeslots, psuidoArrow, tfn);
+		if (!tfn1) {
 			throw new Error(`Type of ${this.fn.inspect()} is not a function : ${tfn.applySub(env.typeslots).inspect()}`);
 		}
 
 		const targ1 = s.applySub(env.typeslots);
-		if (!type.unify(env.typeslots, targ1, targ)) {
+		const targ2 = type.unify(env.typeslots, targ1, targ);
+		if (!targ2) {
 			throw new TypeIncompatibleError(
 				this.argument,
 				targ1.applySub(env.typeslots),
@@ -388,10 +391,11 @@ class Block extends Form {
 				if (forwardType instanceof type.Polymorphic) {
 					forwardType = forwardType.instance(newtype).type;
 				}
-				if (!type.unify(e1.typeslots, forwardType, argtype)) {
+				const argtype1 = type.unify(e1.typeslots, forwardType, argtype)
+				if (!argtype1) {
 					throw new TypeIncompatibleError(form, decType, argtype, this);
 				}
-				argtype = argtype.applySub(e1.typeslots); // apply substitutions produced by *unify*
+				argtype = argtype1.applySub(e1.typeslots); // apply substitutions produced by *unify*
 			}
 
 			decisions.push({
@@ -496,7 +500,7 @@ function translateType(a) {
 		} else if (a[0] === "any") {
 			return new type.Existential(
 				translateType(a[1]),
-				null//translateType(a[2])
+				null // translateType(a[2])
 			);
 		} else if (a.length === 2) {
 			return new type.cmpt(translateType(a[0]), translateType(a[1]));
