@@ -14,8 +14,8 @@ const program = [
 	["declare", "true", "bool"],
 	["declare", "false", "bool"],
 	["declare", "nothing", "unit"],
-	["declare", "+", ["forall", ["'a", "'b"],
-		["->", "'a", ["->", "'b", "'b"]]]],
+	["declare", "+", ["forall", ["'a", "'b", "'c"],
+		["->", "'a", ["->", "'b", "'c"]]]],
 	["declare", "-", ["forall", ["'a"],
 		["->", "'a", ["->", "'a", "'a"]]]],
 	["declare", "==", ["forall", ["'a"],
@@ -49,7 +49,8 @@ const program = [
 			["idx", "1"],
 			["idx", "nothing"],
 			["::", "idx", ["->", "float", "float"]],
-			["map", ["lambda", "x", ["+", "x", "1"]], ["cons", "nothing", ["newlist", "nothing"]]]]]
+			// ["map", ["lambda", "x", ["+", "x", "1"]], ["cons", "nothing", ["newlist", "nothing"]]]]] // should error
+			["map", ["lambda", "x", ["::", ["+", "x", "1"], "int"]], ["cons", "nothing", ["newlist", "nothing"]]]]]
 ];
 const forms = program.map(inference.translate);
 const env = new inference.Environment(null);

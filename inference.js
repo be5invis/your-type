@@ -208,7 +208,6 @@ class Id extends Form {
 	}
 	_materialize(m, env) {
 		let vDef = env.lookup(this.name);
-		const t = this.materializeTypeOf(m, env);
 		if (vDef && vDef.form) {
 			// this variable is a function definition.
 			// materialize it.
@@ -221,20 +220,23 @@ class Id extends Form {
 				for (let [k, v] of idTyping.instanceAssignments) {
 					const v1 = v.applySub(env.typeslots).applySub(m);
 					if (!v1.isClosed()) {
-						throw new Error(`Cannot materialize ${this.name} with a non-closed type ${util.inspect(v1)} assigned to ${util.inspect(k)}.`);
+						throw new Error(`Cannot materialize ${this.name.yellow} with a non-closed type, ${util.inspect(v1)}, assigned to ${util.inspect(k)}.`);
 					}
 					m1.set(k, v1);
 				}
+				const t = this.materializeTypeOf(m, env);
 				let n = vDef.materialize(this.name, t.getMangler(), m1);
 				n.typing = t;
 				return n;
 			} else {
+				const t = this.materializeTypeOf(m, env);
 				// It is monomorphic; Materialize its content and return
 				let n = vDef.materialize(this.name, null, m);
 				n.typing = t;
 				return n;
 			}
 		} else {
+			const t = this.materializeTypeOf(m, env);
 			// Otherwise, it is a plain variable.
 			// Materialize it in the simple way.
 			let n = new Id(this.name);
