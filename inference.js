@@ -388,7 +388,7 @@ class Block extends Form {
 				if (forwardType instanceof type.Polymorphic) {
 					forwardType = forwardType.instance(newtype).type;
 				}
-				if (!type.unify(e1.typeslots, argtype, forwardType)) {
+				if (!type.unify(e1.typeslots, forwardType, argtype)) {
 					throw new TypeIncompatibleError(form, decType, argtype, this);
 				}
 				argtype = argtype.applySub(e1.typeslots); // apply substitutions produced by *unify*

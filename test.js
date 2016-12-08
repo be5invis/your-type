@@ -30,11 +30,17 @@ const program = [
 	["declare", "odd?", ["->", "int", "bool"]],
 	["declare", "even?", ["->", "int", "bool"]],
 	["declare", "hetero", ["list", ["any", "'a"]]],
+
 	["declare", "panic!", ["->", "unit", "!"]],
+	["declare", "dynamic!", ["->", "unit", ["any", "'a"]]],
 
 	["let",
 		["::", "strange", ["any", "'a"]],
 		["strange", "1"],
+		// should error
+		// ["::", "wrong", "int"],
+		// ["wrong", ["dynamic!", "nothing"]],
+
 		[["idx", "x"], "x"],
 		["::", "map", ["forall", ["'k", "'a", "'b"],
 			["->", ["->", "'a", "'b"],

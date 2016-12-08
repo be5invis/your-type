@@ -224,11 +224,9 @@ class Polymorphic {
 	}
 }
 
-// Unify two monomorphic types, p and q with slot mapping m.
+// Unify two monomorphic types, slot mapping m, "desired" s and "actual" t.
 function unify(m, s, t) {
 	if (s instanceof Slot && t instanceof Slot && s.applySub(m).equalTo(t.applySub(m))) {
-		return true;
-	} else if (s instanceof Bottom || t instanceof Bottom) {
 		return true;
 	} else if (s instanceof Primitive && t instanceof Primitive && s.name === t.name && s.kind === t.kind) {
 		return true;
@@ -250,7 +248,9 @@ function unify(m, s, t) {
 		} else {
 			return false;
 		}
-	} else if (s instanceof Existential || t instanceof Existential) {
+	} else if (t instanceof Bottom) {
+		return true;
+	} else if (s instanceof Existential) {
 		return true;
 	} else {
 		return false;
