@@ -105,12 +105,19 @@ class Form {
 		this.typing = null;
 	}
 	inspect() {}
-	inference() {}
+	inference(env) {
+		try {
+			return this._inference(env);
+		} catch(e) {
+			console.log("in", this);
+			throw e;
+		}
+	}
 	materialize(m, env) {
 		try {
 			return this._materialize(m, env);
 		} catch(e) {
-			console.log(this);
+			console.log("in", this);
 			throw e;
 		}
 	}
@@ -138,7 +145,7 @@ class ForwardDeclaration extends Form {
 	inspect() {
 		return this.name + "::" + this.type.inspect();
 	}
-	inference(env) {
+	_inference(env) {
 		env.setVariable(this.name, this.type, new Native(this.name), env);
 		return type.prim("unit");
 	}
@@ -153,7 +160,7 @@ class Limitation extends Form {
 	inspect() {
 		return this.argument + "::" + this.type.inspect();
 	}
-	inference(env) {
+	_inference(env) {
 		let t = (this.type instanceof type.Polymorphic
 			? this.type.instance(newtype).type
 			: this.type).applySub(env.typeslots);
@@ -182,7 +189,7 @@ class Id extends Form {
 		super();
 		this.name = name;
 	}
-	inference(env) {
+	_inference(env) {
 		let id = env.lookup(this.name);
 		if (!id) throw new VariableNotFoundError(this.name);
 
@@ -242,7 +249,7 @@ class MangledId extends Id {
 		super(name);
 		this.mangler = mangler;
 	}
-	inference(env) {
+	_inference(env) {
 		throw new Error("Should not be here.")
 	}
 	materialize(env) {
@@ -259,7 +266,7 @@ class Apply extends Form {
 		this.fn = p;
 		this.argument = q;
 	}
-	inference(env) {
+	_inference(env) {
 		const tfn = this.fn.inference(env).applySub(env.typeslots);
 		const targ = this.argument.inference(env).applySub(env.typeslots);
 
@@ -291,7 +298,9 @@ class Apply extends Form {
 		}
 	}
 	_materialize(m, env) {
-		let n = new Apply(this.fn.materialize(m, env), this.argument.materialize(m, env));
+		const arg = this.argument.materialize(m, env);
+		const fn = this.fn.materialize(m, env);
+		let n = new Apply(fn, arg);
 		n.typing = new TypeAssignment(this.materializeTypeOf(m, env));
 		return n;
 	}
@@ -304,7 +313,7 @@ class Abstraction extends Form {
 		this.body = body;
 		this.derivedEnv = null;
 	}
-	inference(env) {
+	_inference(env) {
 		const e = new Environment(env);
 		const alpha = newtype("A");
 		const beta = newtype("B");
@@ -339,7 +348,7 @@ class Block extends Form {
 		this.e1 = null;
 		this.e2 = null;
 	}
-	inference(env) {
+	_inference(env) {
 		// Infering definitions ALLOW usage of polymorphism.
 		const e1 = new Environment(env);
 		const e2 = new Environment(env);
