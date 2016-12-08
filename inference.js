@@ -109,6 +109,10 @@ class Form {
 		try {
 			return this._inference(env);
 		} catch(e) {
+			if (e.message) {
+				console.log(e.message);
+				e.message = "";
+			}
 			console.log("in", this);
 			throw e;
 		}
@@ -117,6 +121,10 @@ class Form {
 		try {
 			return this._materialize(m, env);
 		} catch(e) {
+			if (e.message) {
+				console.log(e.message);
+				e.message = "";
+			}
 			console.log("in", this);
 			throw e;
 		}
@@ -192,7 +200,6 @@ class Id extends Form {
 	_inference(env) {
 		let id = env.lookup(this.name);
 		if (!id) throw new VariableNotFoundError(this.name);
-
 		let r = id.type, instanceAssignments = null;
 		// Create an instance if its type is polymorphic
 		if (r instanceof type.Polymorphic) {
@@ -485,6 +492,11 @@ function translateType(a) {
 			return new type.Polymorphic(
 				new Set(a[1].map(translateType)),
 				translateType(a[2])
+			);
+		} else if (a[0] === "any") {
+			return new type.Existential(
+				translateType(a[1]),
+				null//translateType(a[2])
 			);
 		} else if (a.length === 2) {
 			return new type.cmpt(translateType(a[0]), translateType(a[1]));

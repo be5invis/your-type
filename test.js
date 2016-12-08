@@ -14,8 +14,8 @@ const program = [
 	["declare", "true", "bool"],
 	["declare", "false", "bool"],
 	["declare", "nothing", "unit"],
-	["declare", "+", ["forall", ["'a", "'b", "'c"],
-		["->", "'a", ["->", "'b", "'c"]]]],
+	["declare", "+", ["forall", ["'a"],
+		["->", "'a", ["->", "'a", "'a"]]]],
 	["declare", "-", ["forall", ["'a"],
 		["->", "'a", ["->", "'a", "'a"]]]],
 	["declare", "==", ["forall", ["'a"],
@@ -29,8 +29,11 @@ const program = [
 	["declare", "not", ["->", "bool", "bool"]],
 	["declare", "odd?", ["->", "int", "bool"]],
 	["declare", "even?", ["->", "int", "bool"]],
+	["declare", "hetero", ["list", ["any", "'a"]]],
 
 	["let",
+		["::", "strange", ["any", "'a"]],
+		["strange", "1"],
 		[["idx", "x"], "x"],
 		["::", "map", ["forall", ["'k", "'a", "'b"],
 			["->", ["->", "'a", "'b"],
@@ -42,15 +45,20 @@ const program = [
 					["head", ["f", ["car", "a"]]],
 					["rear", ["map", "f", ["cdr", "a"]]],
 					["cons", "head", "rear"]]]]],
+		[["length", "a"],
+			["if", ["empty?", "a"],
+				["then", "0"],
+				["else", ["+", "1", ["length", ["cdr", "a"]]]]]],
 		["2", ["+", "1", "1"]],
 		[["odd?", "x"], ["if", ["==", "x", "0"], ["then", "false"], ["else", ["even?", ["-", "x", "1"]]]]],
 		[["even?", "x"], ["if", ["==", "x", "0"], ["then", "true"], ["else", ["odd?", ["-", "x", "1"]]]]],
 		["begin",
-			["idx", "1"],
-			["idx", "nothing"],
+			["idx", "strange"],
 			["::", "idx", ["->", "float", "float"]],
 			// ["map", ["lambda", "x", ["+", "x", "1"]], ["cons", "nothing", ["newlist", "nothing"]]]]] // should error
-			["map", ["lambda", "x", ["::", ["+", "x", "1"], "int"]], ["cons", "nothing", ["newlist", "nothing"]]]]]
+			["map", ["lambda", "x", ["::", ["+", "x", "1"], "int"]], ["cons", "1", ["newlist", "nothing"]]],
+			["map", ["lambda", "x", "x"], "hetero"],
+			["length", "hetero"]]]
 ];
 const forms = program.map(inference.translate);
 const env = new inference.Environment(null);

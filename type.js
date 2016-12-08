@@ -1,5 +1,12 @@
 require("colors");
 
+const newtype = function () {
+	let N = 0;
+	return function () {
+		return new Slot("UY" + (N++));
+	};
+}();
+
 // A monomorphic type
 class Monomorphic {
 	constructor() {}
@@ -117,6 +124,40 @@ class Composite extends Monomorphic {
 		return this.ctor.isClosed() && this.argument.isClosed();
 	}
 }
+// Existential-quantified type, used for dynamic dispatch
+// Existential(quantifier, [purposed condition]) means that "Any type follows the condition"
+class Existential extends Monomorphic {
+	constructor(quantifier, condition) {
+		super();
+		this.quantifier = quantifier;
+		this.condition = condition;
+	}
+	inspect() {
+		return "(any" + this.quantifier.inspect() + ")";
+	}
+	getMangler() {
+		return "(any" + this.quantifier.getMangler() + ")";
+	}
+	applySub(m) {
+		return new Existential(this.quantifier, this.condition);
+	}
+	getInstance(gen) {
+		let t = gen();
+		return {
+			type: t,
+			variables: new Map([[this.quantifier, t]])
+		};
+	}
+	equalTo(t) {
+		return t && t instanceof Existential && this.quantifier.equalTo(t.quantifier);
+	}
+	freeFrom(s) {
+		return true;
+	}
+	isClosed() {
+		return true;
+	}
+}
 
 function convertToNumberingScheme(number) {
 	let baseChar = ("a").charCodeAt(0);
@@ -170,7 +211,7 @@ function unify(m, s, t) {
 	} else if (s instanceof Slot) {
 		let t1 = t.applySub(m);
 		if (t1.freeFrom(s)) {
-			m.set(s, t1);
+			m.set(s, t1.applySub(m));
 			return true;
 		} else {
 			return false;
@@ -178,11 +219,13 @@ function unify(m, s, t) {
 	} else if (t instanceof Slot) {
 		let s1 = s.applySub(m);
 		if (s1.freeFrom(t)) {
-			m.set(t, s1);
+			m.set(t, s1.applySub(m));
 			return true;
 		} else {
 			return false;
 		}
+	} else if (s instanceof Existential || t instanceof Existential) {
+		return true;
 	} else {
 		return false;
 	}
@@ -221,6 +264,8 @@ exports.Polymorphic = Polymorphic;
 exports.Slot = Slot;
 exports.Primitive = Primitive;
 exports.Composite = Composite;
+exports.Existential = Existential;
+
 exports.unify = unify;
 
 exports.slot = slot;
