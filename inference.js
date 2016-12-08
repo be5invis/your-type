@@ -472,8 +472,8 @@ function translateType(a) {
 	if (a instanceof Array) {
 		if (a[0] === "forall") {
 			return new type.Polymorphic(
-				new Set(a.slice(1, -1).map(translateType)),
-				translateType(a[a.length - 1])
+				new Set(a[1].map(translateType)),
+				translateType(a[2])
 			);
 		} else if (a.length === 2) {
 			return new type.cmpt(translateType(a[0]), translateType(a[1]));
@@ -492,15 +492,15 @@ function translateBinding(x) {
 			name: x[1],
 			declareType: translateType(x[2])
 		};
-	} else if (x.length === 2) {
+	} else if (typeof x[0] === "string") {
 		return {
 			name: x[0],
 			form: translate(x[1])
 		};
 	} else {
 		return {
-			name: x[0],
-			form: translate(["lambda"].concat(x.slice(1)))
+			name: x[0][0],
+			form: translate(["lambda"].concat(x[0].slice(1), [x[1]]))
 		};
 	}
 }
