@@ -505,6 +505,8 @@ function translateType(a) {
 		}
 	} else if (a[0] === "'") {
 		return type.slot(a.slice(1));
+	} else if (a[0] === "!") {
+		return new type.Bottom();
 	} else {
 		return type.prim(a);
 	}

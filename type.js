@@ -124,6 +124,30 @@ class Composite extends Monomorphic {
 		return this.ctor.isClosed() && this.argument.isClosed();
 	}
 }
+// Bottom type
+class Bottom extends Monomorphic {
+	constructor() {
+		super();
+	}
+	inspect() {
+		return "!";
+	}
+	getMangler() {
+		return "!";
+	}
+	applySub(m) {
+		return this;
+	}
+	equalTo(t) {
+		return t && t instanceof Bottom;
+	}
+	freeFrom(s) {
+		return true;
+	}
+	isClosed() {
+		return true;
+	}
+}
 // Existential-quantified type, used for dynamic dispatch
 // Existential(quantifier, [purposed condition]) means that "Any type follows the condition"
 class Existential extends Monomorphic {
@@ -204,6 +228,8 @@ class Polymorphic {
 function unify(m, s, t) {
 	if (s instanceof Slot && t instanceof Slot && s.applySub(m).equalTo(t.applySub(m))) {
 		return true;
+	} else if (s instanceof Bottom || t instanceof Bottom) {
+		return true;
 	} else if (s instanceof Primitive && t instanceof Primitive && s.name === t.name && s.kind === t.kind) {
 		return true;
 	} else if (s instanceof Composite && t instanceof Composite) {
@@ -265,6 +291,7 @@ exports.Slot = Slot;
 exports.Primitive = Primitive;
 exports.Composite = Composite;
 exports.Existential = Existential;
+exports.Bottom = Bottom;
 
 exports.unify = unify;
 

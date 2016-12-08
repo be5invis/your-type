@@ -30,6 +30,7 @@ const program = [
 	["declare", "odd?", ["->", "int", "bool"]],
 	["declare", "even?", ["->", "int", "bool"]],
 	["declare", "hetero", ["list", ["any", "'a"]]],
+	["declare", "panic!", ["->", "unit", "!"]],
 
 	["let",
 		["::", "strange", ["any", "'a"]],
@@ -49,13 +50,13 @@ const program = [
 			["if", ["empty?", "a"],
 				["then", "0"],
 				["else", ["+", "1", ["length", ["cdr", "a"]]]]]],
+
 		["2", ["+", "1", "1"]],
 		[["odd?", "x"], ["if", ["==", "x", "0"], ["then", "false"], ["else", ["even?", ["-", "x", "1"]]]]],
 		[["even?", "x"], ["if", ["==", "x", "0"], ["then", "true"], ["else", ["odd?", ["-", "x", "1"]]]]],
 		["begin",
 			["idx", "strange"],
 			["::", "idx", ["->", "float", "float"]],
-			// ["map", ["lambda", "x", ["+", "x", "1"]], ["cons", "nothing", ["newlist", "nothing"]]]]] // should error
 			["map", ["lambda", "x", ["::", ["+", "x", "1"], "int"]], ["cons", "1", ["newlist", "nothing"]]],
 			["map", ["lambda", "x", "x"], "hetero"],
 			["length", "hetero"]]]
