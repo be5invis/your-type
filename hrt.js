@@ -94,7 +94,45 @@ class Type {
 	subst(m) {
 		return this;
 	}
+	// Instantiation
+	// Instantiate the topmost for-alls of the argument type with flexible type variables
+	instantiate(env) {
+		return this;
+	}
+	// Performs deep skolemisation, retuning the skolem constants and the skolemised type
+	skolemise(env) {
+		return this;
+	}
+	// Quantify over the specified type variables (all flexible)
+	quantify(env, mvs) {
+		let usedBinders = this.getBinders();
+		let nRef = {val: 0};
+		let newBinders = [];
+		for (let slot of mvs) {
+			let newBinder = new Slot(generateBinder(nRef, usedBinders));
+			slot.typeRef.val = newBinder;
+			newBinders.push(newBinder);
+		}
+		return new ForAll(newBinders, this.zonk(env));
+	}
+	// Zonking
+	// Eliminate any substitutions in the type
+	zonk(env) {
+		return this;
+	}
 }
+
+// Generate a new binder
+function generateBinder(nRef, used) {
+	nRef.val += 1;
+	let name = "t" + nRef.val;
+	while(used.has(name)){
+		nRef.val += 1;
+		name = "t" + nRef.val;
+	}
+	return name;
+}
+
 class ForAll extends Type {
 	constructor(quantifiers, body) {
 		super();
@@ -123,6 +161,31 @@ class ForAll extends Type {
 			m1.delete(q);
 		}
 		return new ForAll(this.quantifiers, this.body.subst(m1));
+	}
+	instantiate(env) {
+		let m = new Map();
+		for (let q of type.quantifiers) {
+			m.set(q, new MetaSlot(env.newMetaSlotVal()));
+		}
+		return this.body.subst(m);
+	}
+	skolemise(env) {
+		let m = new Map();
+		for (let q of type.quantifiers) {
+			m.set(q, new Slot(env.newSkolemVariable()));
+		}
+		let {map: m1, type: t1} = skolemise(env, this.body.subst(m));
+		for (let [k, v] of m1.entries()) {
+			m.set(k, v);
+		}
+		return {
+			map: m,
+			type: t1
+		};
+	}
+
+	zonk(env) {
+		return new ForAll(this.quantifiers, this.body.zonk(env));
 	}
 }
 class Primitive extends Type {
@@ -170,6 +233,16 @@ class Composite extends Type {
 	subst(m) {
 		return new Composite(this.fn.subst(m), this.arg.subst(m));
 	}
+	skolemise(env) {
+		let {map:m1, type:t1} = skolemise(env, this.arg);
+		return {
+			map: m1,
+			type: new Composite(this.fn, t1)
+		};
+	}
+	zonk(env) {
+		return new Composite(this.fn.zonk(env), this.arg.zonk(env));
+	}
 }
 class MetaSlot extends Type {
 	constructor(arg) {
@@ -181,12 +254,21 @@ class MetaSlot extends Type {
 			a.set(this.arg.id, this.arg);
 		}
 	}
+	zonk(env) {
+		if (this.typeRef.val) {
+			let t1 = this.typeref.val.zonk(env);
+			this.typeRef.val = t1;
+			return t1;
+		} else {
+			return this;
+		}
+	}
 }
 // MetaVal -- can unify with any tau-type
 class MetaSlotVal {
-	constructor(id, tau) {
+	constructor(id, typeRef) {
 		this.id = id;
-		this.tau = tau;
+		this.typeRef = typeRef;
 	}
 	equalTo(that) {
 		return that && that instanceof MetaSlotVal && that.id === this.id;
@@ -224,20 +306,4 @@ class Environment {
 		const u = this.newUnique();
 		return "." + u + "." + s;
 	}
-}
-
-
-function instantiate(env, type) {
-	if (type instanceof ForAll) {
-		let m = new Map();
-		for (let q of type.quantifiers) {
-			m.set(q, new MetaSlot(env.newMetaSlotVal()));
-		}
-		return type.body.subst(m);
-	} else {
-		return type;
-	}
-}
-
-function skolemise(env, type) {
 }
