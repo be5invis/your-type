@@ -256,7 +256,7 @@ class MetaSlot extends Type {
 	}
 	zonk(env) {
 		if (this.typeRef.val) {
-			let t1 = this.typeref.val.zonk(env);
+			let t1 = this.typeRef.val.zonk(env);
 			this.typeRef.val = t1;
 			return t1;
 		} else {
@@ -306,4 +306,53 @@ class Environment {
 		const u = this.newUnique();
 		return "." + u + "." + s;
 	}
+}
+
+// ////Unification
+
+function unify(t1, t2) {
+	if (badtype(t1) || badtype(t2)) throw "Should not be here."
+	if (t1 instanceof Slot && t2 instanceof Slot && t1.name === t2.name) return true;
+	if (t1 instanceof MetaSlot && t2 instanceof MetaSlot && t1.arg.equalTo(t2.arg)) return true;
+	if (t1 instanceof MetaSlot) return unifyVar(t1.arg, t2);
+	if (t2 instanceof MetaSlot) return unifyVar(t2.arg, t1);
+	if (t1 instanceof Composite && t2 instanceof Composite) {
+		unify(t1.fn, t2.fn);
+		unify(t2.arg, t2.arg);
+		return true;
+	}
+	if (t1 instanceof Primitive && t2 instanceof Primitive && t1.name === t2.name) {return true;}
+	throw "Cannot unify."
+}
+
+function unifyVar(msv, ty) {
+	if (msv.typeRef.val) {
+		return unify(msv.typeRef.val, ty);
+	} else {
+		return unifyUnbound(msv, ty);
+	}
+}
+
+function unifyUnbound(msv, ty) {
+	if (ty instanceof MetaSlot) {
+		let msv2 = ty.arg;
+		if (msv2.typeRef.val) {
+			return unify(new MetaSlot(msv), msv2.typeRef.val);
+		} else {
+			msv.typeRef.val = ty;
+			return true;
+		}
+	} else {
+		let msvs2 = ty.getMetaSlots();
+		if (msvs2.has(msv.id)) {
+			throw "Recursive Type."
+		} else {
+			msv.typeRef.val = ty;
+			return true;
+		}
+	}
+}
+
+function badtype(t) {
+	return t instanceof Slot && t.name[0] !== ".";
 }
