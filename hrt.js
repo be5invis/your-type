@@ -1,3 +1,6 @@
+const util = require("util");
+
+
 // //// TYPES
 class Type {
 	constructor() {}
@@ -100,7 +103,7 @@ class Type {
 	 * @param{Type} that
 	 */
 	subsCheck(env, that) {
-		const {map:skolTvs, rho2} = this.skolemise(env);
+		const {map:skolTvs, type:rho2} = this.skolemise(env);
 		this.subsCheckRho(env, rho2);
 		const escTvs = new Set(env.getAllFreeSlots([this, that]));
 		for (let [k, v] of skolTvs) {
@@ -114,8 +117,17 @@ class Type {
 	 * @param{Type} that
 	 */
 	subsCheckRho(env, that) {
+		if (that instanceof Composite) {
+			const [f1, a1] = unifyComposite(this, env);
+			subsCheckComposite(env, f1, that.fn, a1, that.arg);
+		}
 		return unify(this, that);
 	}
+}
+
+function subsCheckComposite(env, f1, f2, a1, a2) {
+	f1.subsCheck(env, f2);
+	a1.subsCheckRho(env, a1);
 }
 
 // Generate a new binder
@@ -174,7 +186,7 @@ class ForAll extends Type {
 		for (let q of this.quantifiers) {
 			m.set(q, new Slot(env.newSkolemVariable()));
 		}
-		let {map: m1, type: t1} = skolemise(env, this.body.subst(m));
+		let {map: m1, type: t1} = this.body.subst(m).skolemise(env);
 		for (let [k, v] of m1.entries()) {
 			m.set(k, v);
 		}
@@ -192,7 +204,7 @@ class ForAll extends Type {
 	 * @param{Type} that
 	 */
 	subsCheckRho(env, that) {
-		return this.instantiate(env).subsCheckRho(that);
+		return this.instantiate(env).subsCheckRho(env, that);
 	}
 }
 class Primitive extends Type {
@@ -251,7 +263,7 @@ class Composite extends Type {
 		return new Composite(this.fn.subst(m), this.arg.subst(m));
 	}
 	skolemise(env) {
-		let {map:m1, type:t1} = skolemise(env, this.arg);
+		let {map:m1, type:t1} = this.arg.skolemise(env);
 		return {
 			map: m1,
 			type: new Composite(this.fn, t1)
@@ -265,13 +277,8 @@ class Composite extends Type {
 	 * @param{Type} that
 	 */
 	subsCheckRho(env, that) {
-		if (that instanceof Composite) {
-			this.fn.subsCheck(that.fn);
-			this.arg.subsCheckRho(that.arg);
-			return true;
-		} else {
-			return unify(this, that);
-		}
+		const [f2, a2] = unifyComposite(that, env);
+		return subsCheckComposite(env, this.fn, f2, this.arg, a2);
 	}
 }
 class MetaSlot extends Type {
@@ -459,6 +466,21 @@ function unifyFun(type, env) {
 	}
 }
 /**
+ * @param {Type} type
+ * @param {Environment} env
+ * @returns {[Type, Type]}
+ */
+function unifyComposite(type, env) {
+	if (type instanceof Composite) {
+		return [type.fn, type.arg];
+	} else {
+		const argMsv = env.newMetaSlotVal();
+		const resMsv = env.newMetaSlotVal();
+		unify(type, new Composite(new MetaSlot(argMsv), new MetaSlot(resMsv)));
+		return [argMsv, resMsv];
+	}
+}
+/**
  * @param {Type} t
  * @returns {boolean}
  */
@@ -516,7 +538,7 @@ class Term {
 	 */
 	checkSigma(env, sigma) {
 		const {map: mvs, type: rho} = sigma.skolemise(env);
-		this.checkRho(rho);
+		this.checkRho(env, rho);
 		const envTys = env.getTypes();
 		const escTvs = new Set(env.getAllFreeSlots(envTys));
 		for (let [name, slot] of mvs) {
@@ -528,7 +550,7 @@ class Term {
 }
 class Lit extends Term {
 	/**
-	 * @param {number} n
+	 * @param {any} n
 	 */
 	constructor(n) {
 		super();
@@ -538,7 +560,13 @@ class Lit extends Term {
 		return true;
 	}
 	tcRho(env, exp) {
-		return new Primitive("int").instSigma(env, exp);
+		if (typeof this.lit === "number") {
+			return new Primitive("int").instSigma(env, exp);
+		} else if (typeof this.lit === "string") {
+			return new Primitive("str").instSigma(env, exp);
+		} else {
+			return new Primitive("unit").instSigma(env, exp);
+		}
 	}
 }
 class Var extends Term {
@@ -570,7 +598,7 @@ class App extends Term {
 	tcRho(env, exp) {
 		const funTy = this.fn.inferRho(env);
 		const [argTy, resTy] = unifyFun(funTy, env);
-		this.arg.checkRho(env, argTy);
+		this.arg.checkSigma(env, argTy);
 		return resTy.instSigma(env, exp);
 	}
 }
@@ -622,7 +650,7 @@ class ALam extends Term {
 			const env1 = env.extend(this.param, varTy);
 			return this.body.checkRho(env1, bodyTy);
 		} else {
-			const env1 = env.extend(this.name, this.type);
+			const env1 = env.extend(this.param, this.type);
 			const bodyTy = this.body.inferRho(env1);
 			exp.infer.val = FunctionType(this.type, bodyTy);
 		}
@@ -668,7 +696,68 @@ class Ann extends Term {
 	}
 }
 
-const a = new Let("f", new Lam("x", new Var("x")), new App(new Var("f"), new Lit("1")));
-const env = new Environment({val: 0}, new Map());
 
-console.log(a.inferSigma(env));
+function translateType(a) {
+	if (a instanceof Array) {
+		if (a[0] === "forall") {
+			return new ForAll(
+				a[1].map(x => translateType(x).name),
+				translateType(a[2])
+			);
+		} else if (a.length === 2) {
+			return new Composite(translateType(a[0]), translateType(a[1]));
+		} else {
+			return new Composite(translateType(a.slice(0, -1)), translateType(a[a.length - 1]));
+		}
+	} else if (a[0] === "'") {
+		return new Slot(a.slice(1));
+	} else {
+		return new Primitive(a);
+	}
+}
+
+function translate(a) {
+	if (!a) {
+		return new Lit(a);
+	} else if (a instanceof Array) {
+		if (a[0] === "let") {
+			return new Let(a[1], translate(a[2]), translate(a[3]));
+		} else if (a[0] === "a-lambda" && a.length >= 4) {
+			const ty = translateType(a[a.length - 1]);
+			const fn0 = translate(a[a.length - 2]);
+			const l = a.slice(1, -2).reduceRight((fn, term) => new Lam(term, fn), fn0);
+			return new ALam(l.param, ty, l.body);
+		} else if (a[0] === "lambda" && a.length >= 3) {
+			const fn0 = translate(a[a.length - 1]);
+			return a.slice(1, -1).reduceRight((fn, term) => new Lam(term, fn), fn0);
+		} else if (a[0] === "begin") {
+			return translate(a.slice(1).reduceRight((y, x) => ["seq", x, y]));
+		} else if (a.length === 2) {
+			return new App(translate(a[0]), translate(a[1]));
+		} else {
+			return new App(translate(a.slice(0, a.length - 1)), translate(a[a.length - 1]));
+		}
+	} else if (typeof a === "string") {
+		return new Var(a);
+	} else {
+		return new Lit(a);
+	}
+}
+
+const env = new Environment({val: 0}, new Map([[
+	"&", translateType(["forall", ["'a", "'b"],
+		["->", "'a",
+			["->", "'b",
+				["*", "'a", "'b"]]]])
+]]));
+
+const a = translate(
+	["let", "id", ["lambda", "x", "x"],
+		["let", "f",
+			["a-lambda", "x",
+				["&", ["x", 1], ["x", null]],
+				["forall", ["'a"], ["->", "'a", "'a"]]],
+			["f", "id"]]]
+);
+
+console.log(util.inspect(a.inferSigma(env), {depth: null}));
