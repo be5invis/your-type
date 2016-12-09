@@ -2,7 +2,7 @@
 
 <html>
 <head>
-  <title>`hrt.js`, A Rank-N Type Inference Algorithm</title>
+  <title>`hrt.js`, A Rank-N Type Inferencer</title>
   <meta http-equiv="content-type" content="text/html; charset=UTF-8">
   <meta name="viewport" content="width=device-width, target-densitydpi=160dpi, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
   <link rel="stylesheet" media="all" href="docco.css" />
@@ -31,7 +31,7 @@
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-1">&#182;</a>
               </div>
-              <h1 id="-hrt-js-a-rank-n-type-inference-algorithm"><code>hrt.js</code>, A Rank-N Type Inference Algorithm</h1>
+              <h1 id="-hrt-js-a-rank-n-type-inferencer"><code>hrt.js</code>, A Rank-N Type Inferencer</h1>
 <p>本文主要参照 Simon Peyton Jones 等的论文 <em>Practical type inference for arbitrary-rank types</em> 实现了一个 Rank-N 的类型推理算法。</p>
 <p>此算法的逻辑学表述可参见文献 31 页，Haskell 代码可参见其附件。这份 JavaScript 代码由其 Haskell 版本改写而来。</p>
 
@@ -80,7 +80,7 @@
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-3">&#182;</a>
               </div>
-              <h4 id="extend-this-environment-string-type-environment">extend :: this Environment × string × Type → Environment</h4>
+              <h4 id="extend-this-environment-string-type-environment">extend :: <em>this</em> Environment × string × Type → Environment</h4>
 <p>创建一个扩展环境 $\Gamma, x:t$，增加一个变量</p>
 
             </div>
@@ -104,7 +104,7 @@
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-4">&#182;</a>
               </div>
-              <h4 id="extendn-this-environment-name-string-type-type-environment">extendN :: this Environment × [{name: string, type: Type}] → Environment</h4>
+              <h4 id="extendn-this-environment-name-string-type-type-environment">extendN :: <em>this</em> Environment × [{name: string, type: Type}] → Environment</h4>
 <p>创建一个扩展环境 $\Gamma,\overline{x:t}$，增加一组变量。此函数用于 let rec 的构建</p>
 
             </div>
@@ -129,7 +129,7 @@
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-5">&#182;</a>
               </div>
-              <h4 id="lookup-this-environment-string-type">lookup :: this Environment × string → Type</h4>
+              <h4 id="lookup-this-environment-string-type">lookup :: <em>this</em> Environment × string → Type</h4>
 <p>查找名称定义</p>
 
             </div>
@@ -155,7 +155,7 @@
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-6">&#182;</a>
               </div>
-              <h4 id="newunique-this-environment-number">newUnique :: this Environment → number</h4>
+              <h4 id="newunique-this-environment-number">newUnique :: <em>this</em> Environment → number</h4>
 <p>增加计数器，生成唯一性的数值</p>
 
             </div>
@@ -174,7 +174,7 @@
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-7">&#182;</a>
               </div>
-              <h4 id="newmetaslotval-this-environment-metaslotval">newMetaSlotVal :: this Environment → MetaSlotVal</h4>
+              <h4 id="newmetaslotval-this-environment-metaslotval">newMetaSlotVal :: <em>this</em> Environment → MetaSlotVal</h4>
 <p>生成新的 Meta slot value</p>
 
             </div>
@@ -194,14 +194,14 @@
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-8">&#182;</a>
               </div>
-              <h4 id="newskolemvariable-this-environment-string">newSkolemVariable :: this Environment → string</h4>
+              <h4 id="newskolemvariable-this-environment-string">newSkolemVariable :: <em>this</em> Environment → string</h4>
 <p>生成新的 Skolem slot 名称</p>
 
             </div>
             
             <div class="content"><div class='highlight'><pre>	newSkolemVariable(s) {
 		<span class="hljs-keyword">const</span> u = <span class="hljs-keyword">this</span>.newUnique();
-		<span class="hljs-keyword">return</span> rawNameToSkolemisedName(u, s);
+		<span class="hljs-keyword">return</span> rawNameToskolmeizedName(u, s);
 	}</pre></div></div>
             
         </li>
@@ -213,7 +213,7 @@
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-9">&#182;</a>
               </div>
-              <h4 id="gettypes-this-environment-iterableiterator-type">getTypes :: this Environment → IterableIterator Type</h4>
+              <h4 id="gettypes-this-environment-iterableiterator-type">getTypes :: <em>this</em> Environment → IterableIterator Type</h4>
 <p>获得所有已定义变量的类型列表</p>
 
             </div>
@@ -231,7 +231,7 @@
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-10">&#182;</a>
               </div>
-              <h4 id="gettypes-this-environment-iterableiterator-number-metaslot-">getTypes :: this Environment → IterableIterator [number, MetaSlot]</h4>
+              <h4 id="gettypes-this-environment-iterableiterator-number-metaslot-">getTypes :: <em>this</em> Environment → IterableIterator [number, MetaSlot]</h4>
 <p>获得当前环境中所有已定义变量类型中的所有 Meta slot</p>
 
             </div>
@@ -255,7 +255,7 @@
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-11">&#182;</a>
               </div>
-              <h4 id="gettypes-this-environment-iterableiterator-string">getTypes :: this Environment × → IterableIterator string</h4>
+              <h4 id="gettypes-this-environment-iterableiterator-string">getTypes :: <em>this</em> Environment × → IterableIterator string</h4>
 <p>获得当前环境中所有已定义变量类型中的所有自由 slot</p>
 
             </div>
@@ -271,10 +271,10 @@
 	}
 }
 
-<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">rawNameToSkolemisedName</span>(<span class="hljs-params">u, n</span>) </span>{
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">rawNameToskolmeizedName</span>(<span class="hljs-params">u, n</span>) </span>{
 	<span class="hljs-keyword">return</span> <span class="hljs-string">"."</span> + u + <span class="hljs-string">"."</span> + n;
 }
-<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">rawNameOfSkolemisedName</span>(<span class="hljs-params">n</span>) </span>{
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">rawNameOfskolmeizedName</span>(<span class="hljs-params">n</span>) </span>{
 	<span class="hljs-keyword">return</span> n.replace(<span class="hljs-regexp">/^\.\d+\./</span>, <span class="hljs-string">""</span>);
 }</pre></div></div>
             
@@ -295,14 +295,14 @@
 <li>Composite，表示一个复合类型，如 $\rm list\ int$。函数类型是一种二级复合。</li>
 <li>ForAll，表示一个多态量化 $\forall \overline\alpha. t$。</li>
 </ul>
-<p>此外在推理过程中，会涉及一种 Meta Slot，它代表一个尚未完全决议的类型。</p>
+<p>此外在推理过程中，会涉及一种 Meta Slot，它代表一个尚未完全决议的类型。使用这种方式处理推理中的中间结果最早可见于 Jones 的另一篇文献，<em>Boxy Types: Inference for Higher-Rank Types and Impredicativity</em>。</p>
 <p>我们将类型分为 $\sigma$, $\rho$, $\tau$ 三类，它们满足：</p>
 <ul>
 <li>$\tau \rightarrow \mathrm{Primitive}\ |\  a\ |\ \tau_1 \tau_2$</li>
 <li>$\rho \rightarrow \tau\ |\ \sigma_1 \sigma_2$</li>
 <li>$\sigma \rightarrow \forall \overline{a}.\rho$</li>
 </ul>
-<p>可以看出，$\sigma$ 类型为直接包含多态的类型，$\rho$ 类型则为嵌有多态结构的复合类型。在传统的 Hindley-Milner 系统中，$\rho$ 类型的第二种形式并不允许。</p>
+<p>可以看出，$\sigma$ 类型为直接包含多态的类型，$\rho$ 类型则为嵌有多态结构的复合类型。在传统的 Hindley-Milner 系统中，$\rho$ 类型的第二种形式并不允许，它和 $\tau$ 类型完全等价。</p>
 
             </div>
             
@@ -318,7 +318,7 @@
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-13">&#182;</a>
               </div>
-              <h4 id="pretty-print">Pretty-print</h4>
+              <h4 id="inspect-this-type-string">inspect :: <em>this</em> Type → string</h4>
 
             </div>
             
@@ -333,8 +333,8 @@
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-14">&#182;</a>
               </div>
-              <h4 id="getmetaslots-this-type-map-number-metaslot">getMetaSlots :: this Type → Map number MetaSlot</h4>
-<p>获取当前类型中所有出现的 Meta slot。返回一个 number 到 meta slot 的映射</p>
+              <h4 id="getmetaslots-this-type-map-number-metaslot">getMetaSlots :: <em>this</em> Type → Map number MetaSlot</h4>
+<p>获取当前类型中所有出现的 Meta slot。返回一个 id 到 meta slot 的映射。根据 Meta slot value 的定义，任何两个 id 相同的 Meta slot 都视作相等。</p>
 
             </div>
             
@@ -357,8 +357,8 @@
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-15">&#182;</a>
               </div>
-              <h4 id="getfreeslots-this-type-set-string">getFreeSlots :: this Type → Set string</h4>
-<p>获取当前类型中所有出现的未绑定 slot。</p>
+              <h4 id="getfreeslots-this-type-set-string">getFreeSlots :: <em>this</em> Type → Set string</h4>
+<p>获取当前类型中所有出现的未绑定 slot。返回它们的名字组成的集合。</p>
 
             </div>
             
@@ -383,8 +383,8 @@
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-16">&#182;</a>
               </div>
-              <h4 id="getbinders-this-type-set-string">getBinders :: this Type → Set string</h4>
-<p>获取当前类型中所有 forall 使用的 binder</p>
+              <h4 id="getbinders-this-type-set-string">getBinders :: <em>this</em> Type → Set string</h4>
+<p>获取当前类型中所有被 forall 使用的 slot 名字。返回其集合。</p>
 
             </div>
             
@@ -407,8 +407,8 @@
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-17">&#182;</a>
               </div>
-              <h4 id="subst-this-type-map-string-type-type">subst :: this Type × Map string Type → Type</h4>
-<p>根据 m 的要求，替换一些 slot 的内容</p>
+              <h4 id="subst-this-type-map-string-type-type">subst :: <em>this</em> Type × Map string Type → Type</h4>
+<p>根据 m 的要求，替换一些 slot 的内容。</p>
 
             </div>
             
@@ -429,7 +429,7 @@
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-18">&#182;</a>
               </div>
-              <h4 id="instantiate-this-type-environment-type">instantiate :: this Type × Environment → Type</h4>
+              <h4 id="instantiate-this-type-environment-type">instantiate :: <em>this</em> Type × Environment → Type</h4>
 <p>在环境 env 中，实例化当前的多态类型。它会去除顶层的 $\forall$ 符号。</p>
 
             </div>
@@ -451,9 +451,9 @@
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-19">&#182;</a>
               </div>
-              <h4 id="skolemise-this-type-environment-map-map-string-slot-type-type-">skolemise :: this Type × Environment → {map: Map string Slot, type: Type}</h4>
+              <h4 id="skolmeize-this-type-environment-map-map-string-slot-type-type-">skolmeize :: <em>this</em> Type × Environment → {map: Map string Slot, type: Type}</h4>
 <p>在当前环境 env 中，产生当前类型的一个斯科伦范式形式。它可以看作实例化的递归版本，会展开每一层的多态，同时会返回新产生的临时变量的表（这里使用一个名字到 Slot 的 Map 实现）。我们不会展开复合类型的前件，避免错误地捕捉变量。此过程产生的类型必然保证：所有符合构造的后件不包含任何的多态。</p>
-<p>一个实例是：$\mathrm{skolmeise}(\forall a.a\rightarrow(\forall b.b\rightarrow b))=\forall t_1 t_2. t_1 \rightarrow (t_2 \rightarrow t_2)$</p>
+<p>一个实例是：$\mathrm{skol}(\forall a.a\rightarrow(\forall b.b\rightarrow b))=\forall ab. a \rightarrow (b \rightarrow b)$</p>
 
             </div>
             
@@ -461,7 +461,7 @@
 	 * @param {Environment} env
 	 * @returns {{map: Map&lt;string, Slot&gt;, type: Type}}
 	 */</span>
-	skolemise(env) {
+	skolmeize(env) {
 		<span class="hljs-keyword">return</span> {
 			<span class="hljs-attr">map</span>: <span class="hljs-keyword">new</span> <span class="hljs-built_in">Map</span>(),
 			<span class="hljs-attr">type</span>: <span class="hljs-keyword">this</span>
@@ -477,7 +477,7 @@
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-20">&#182;</a>
               </div>
-              <h4 id="generalize-this-type-environment-metaslotval-forall">generalize :: this Type × Environment × [MetaSlotVal] → ForAll</h4>
+              <h4 id="generalize-this-type-environment-metaslotval-forall">generalize :: <em>this</em> Type × Environment × [MetaSlotVal] → ForAll</h4>
 <p>在当前环境 env 中，根据 mvs 列表泛化当前类型。将返回一个多态类型。</p>
 
             </div>
@@ -508,7 +508,7 @@
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-21">&#182;</a>
               </div>
-              <h4 id="zonk-this-type-environment-type">zonk :: this Type × Environment → Type</h4>
+              <h4 id="zonk-this-type-environment-type">zonk :: <em>this</em> Type × Environment → Type</h4>
 <p>消除掉当前类型中所有的 Meta Slot。</p>
 
             </div>
@@ -530,7 +530,7 @@
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-22">&#182;</a>
               </div>
-              <h4 id="instsigmainfer-this-type-environment-type">instSigmaInfer :: this Type × Environment → Type</h4>
+              <h4 id="instsigmainfer-this-type-environment-type">instSigmaInfer :: <em>this</em> Type × Environment → Type</h4>
 <p>在类型推理时，生成一个实例化的版本</p>
 <p>INFER-INST: $\dfrac{}{\forall \overline a. \rho \le \sim [\overline{a\rightarrow\mathrm{fresh}}]\rho}$</p>
 
@@ -553,7 +553,7 @@
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-23">&#182;</a>
               </div>
-              <h4 id="instsigmacheck-this-type-environment-type-boolean">instSigmaCheck :: this Type × Environment × Type → boolean</h4>
+              <h4 id="instsigmacheck-this-type-environment-type-boolean">instSigmaCheck :: <em>this</em> Type × Environment × Type → boolean</h4>
 <p>在类型推理时，检查本类型是否符合需求</p>
 
             </div>
@@ -575,7 +575,7 @@
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-24">&#182;</a>
               </div>
-              <h4 id="subscheck-this-type-environment-type-boolean-br-subscheckrho-this-type-environment-type-boolean">subsCheck :: this Type × Environment × Type → boolean <br> subsCheckRho :: this Type × Environment × Type → boolean</h4>
+              <h4 id="subscheck-this-type-environment-type-boolean-br-subscheckrho-this-type-environment-type-boolean">subsCheck :: <em>this</em> Type × Environment × Type → boolean <br> subsCheckRho :: <em>this</em> Type × Environment × Type → boolean</h4>
 <p>判断某个类型是否比另一个类型更加「泛化」。
 我们把它拆分成两个部分：$\rm subsCheck$ 和 $\rm subsCheckRho$，前者处理两个 $\sigma$ 类型，后者处理一个 $\sigma$ 类型和一个 $\rho$ 类型。</p>
 
@@ -600,7 +600,7 @@
 
             </div>
             
-            <div class="content"><div class='highlight'><pre>		<span class="hljs-keyword">const</span> {<span class="hljs-attr">map</span>: skolTvs, <span class="hljs-attr">type</span>: rho2} = that.skolemise(env);</pre></div></div>
+            <div class="content"><div class='highlight'><pre>		<span class="hljs-keyword">const</span> {<span class="hljs-attr">map</span>: skolTvs, <span class="hljs-attr">type</span>: rho2} = that.skolmeize(env);</pre></div></div>
             
         </li>
         
@@ -638,7 +638,7 @@
             
             <div class="content"><div class='highlight'><pre>		<span class="hljs-keyword">const</span> escTvs = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Set</span>(env.getAllFreeSlots([<span class="hljs-keyword">this</span>]));
 		<span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> [k, v] <span class="hljs-keyword">of</span> skolTvs) {
-			<span class="hljs-keyword">if</span> (escTvs.has(rawNameOfSkolemisedName(k))) {
+			<span class="hljs-keyword">if</span> (escTvs.has(rawNameOfskolmeizedName(k))) {
 				<span class="hljs-keyword">throw</span> <span class="hljs-string">"Subsumption check failed"</span>
 			}
 		}
@@ -791,7 +791,7 @@
 	}
 	equalTo(that) {
 		<span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.isSkolem() &amp;&amp; that.isSkolem()) {
-			<span class="hljs-keyword">return</span> rawNameOfSkolemisedName(<span class="hljs-keyword">this</span>.name) === rawNameOfSkolemisedName(that.name);
+			<span class="hljs-keyword">return</span> rawNameOfskolmeizedName(<span class="hljs-keyword">this</span>.name) === rawNameOfskolmeizedName(that.name);
 		} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (!<span class="hljs-keyword">this</span>.isSkolem() &amp;&amp; !that.isSkolem()) {
 			<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.name === that.name;
 		} <span class="hljs-keyword">else</span> {
@@ -890,8 +890,8 @@
 
             </div>
             
-            <div class="content"><div class='highlight'><pre>	skolemise(env) {
-		<span class="hljs-keyword">let</span> {<span class="hljs-attr">map</span>: m1, <span class="hljs-attr">type</span>: t1} = <span class="hljs-keyword">this</span>.arg.skolemise(env);
+            <div class="content"><div class='highlight'><pre>	skolmeize(env) {
+		<span class="hljs-keyword">let</span> {<span class="hljs-attr">map</span>: m1, <span class="hljs-attr">type</span>: t1} = <span class="hljs-keyword">this</span>.arg.skolmeize(env);
 		<span class="hljs-keyword">return</span> {
 			<span class="hljs-attr">map</span>: m1,
 			<span class="hljs-attr">type</span>: <span class="hljs-keyword">new</span> Composite(<span class="hljs-keyword">this</span>.fn, t1, <span class="hljs-keyword">this</span>.contravariant)
@@ -1015,7 +1015,7 @@
             <div class="content"><div class='highlight'><pre>	<span class="hljs-comment">/**
 	 * @param {Environment} env
 	 */</span>
-	skolemise(env) {
+	skolmeize(env) {
 		<span class="hljs-keyword">let</span> m = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Map</span>();
 		<span class="hljs-keyword">let</span> mSub = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Map</span>();
 		<span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> q <span class="hljs-keyword">of</span> <span class="hljs-keyword">this</span>.quantifiers) {
@@ -1024,7 +1024,7 @@
 			m.set(sv, ss);
 			mSub.set(q, ss);
 		}
-		<span class="hljs-keyword">let</span> {<span class="hljs-attr">map</span>: m1, <span class="hljs-attr">type</span>: t1} = <span class="hljs-keyword">this</span>.body.subst(mSub).skolemise(env);
+		<span class="hljs-keyword">let</span> {<span class="hljs-attr">map</span>: m1, <span class="hljs-attr">type</span>: t1} = <span class="hljs-keyword">this</span>.body.subst(mSub).skolmeize(env);
 		<span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> [k, v] <span class="hljs-keyword">of</span> m1.entries()) {
 			m.set(k, v);
 		}
@@ -1342,7 +1342,7 @@
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-50">&#182;</a>
               </div>
-              <h4 id="checkrho-this-term-environment-type-boolean">checkRho :: this Term × Environment × Type → boolean</h4>
+              <h4 id="checkrho-this-term-environment-type-boolean">checkRho :: <em>this</em> Term × Environment × Type → boolean</h4>
 <p>在环境 env 中检查当前表达式是否符合 $\rho$ 类型 type</p>
 <p>$\Gamma\vdash t : \rho$</p>
 
@@ -1366,7 +1366,7 @@
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-51">&#182;</a>
               </div>
-              <h4 id="inferrho-this-term-environment-type">inferRho :: this Term × Environment → Type</h4>
+              <h4 id="inferrho-this-term-environment-type">inferRho :: <em>this</em> Term × Environment → Type</h4>
 <p>在环境 env 中推理，尝试得到 $\rho$ 类型（或者报错）</p>
 <p>$\Gamma\vdash t :\sim \rho$</p>
 
@@ -1392,9 +1392,9 @@
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-52">&#182;</a>
               </div>
-              <h4 id="checksigma-this-term-environment-type-boolean">checkSigma :: this Term × Environment × Type → boolean</h4>
+              <h4 id="checksigma-this-term-environment-type-boolean">checkSigma :: <em>this</em> Term × Environment × Type → boolean</h4>
 <p>在环境 env 中检查当前表达式是否符合 $\sigma$ 类型 type</p>
-<p>CHECK-SIGMA:$\dfrac{\overline a \not\in \mathrm{free}(\Gamma)\quad \Gamma\vdash t:\rho\quad \forall\overline a.\rho = \mathrm{skol}(\sigma)}{\Gamma\vdash^* t:\sigma}$</p>
+<p>CHECK-SIGMA: $\dfrac{\overline a \not\in \mathrm{free}(\Gamma)\quad \Gamma\vdash t:\rho\quad \forall\overline a.\rho = \mathrm{skol}(\sigma)}{\Gamma\vdash^* t:\sigma}$</p>
 
             </div>
             
@@ -1403,12 +1403,12 @@
 	 * @param{Type} sigma
 	 */</span>
 	checkSigma(env, type) {
-		<span class="hljs-keyword">const</span> {<span class="hljs-attr">map</span>: mvs, <span class="hljs-attr">type</span>: rho} = type.skolemise(env);
+		<span class="hljs-keyword">const</span> {<span class="hljs-attr">map</span>: mvs, <span class="hljs-attr">type</span>: rho} = type.skolmeize(env);
 		<span class="hljs-keyword">this</span>.checkRho(env, rho);
 		<span class="hljs-keyword">const</span> envTys = env.getTypes();
 		<span class="hljs-keyword">const</span> escTvs = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Set</span>(env.getAllFreeSlots(envTys));
 		<span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> [name, slot] <span class="hljs-keyword">of</span> mvs) {
-			<span class="hljs-keyword">if</span> (escTvs.has(rawNameOfSkolemisedName(name))) {
+			<span class="hljs-keyword">if</span> (escTvs.has(rawNameOfskolmeizedName(name))) {
 				<span class="hljs-keyword">throw</span> <span class="hljs-string">"Type is not polymorphic enough"</span>
 			}
 		}
@@ -1424,9 +1424,9 @@
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-53">&#182;</a>
               </div>
-              <h4 id="infersigma-this-term-environment-type">inferSigma :: this Term × Environment → Type</h4>
+              <h4 id="infersigma-this-term-environment-type">inferSigma :: <em>this</em> Term × Environment → Type</h4>
 <p>在环境 env 中推理，尝试得到 $\sigma$ 类型（或者报错）</p>
-<p>INFER-SIGMA:$\dfrac{\overline a = \mathrm{free}(\rho)-\mathrm{free}(\Gamma)\quad \Gamma\vdash t:\sim \rho}{\Gamma\vdash^* t:\sim\forall\overline a.\rho}$</p>
+<p>INFER-SIGMA: $\dfrac{\overline a = \mathrm{free}(\rho)-\mathrm{free}(\Gamma)\quad \Gamma\vdash t:\sim \rho}{\Gamma\vdash^* t:\sim\forall\overline a.\rho}$</p>
 
             </div>
             
@@ -1930,7 +1930,7 @@
             
             <div class="content"><div class='highlight'><pre>	<span class="hljs-comment">/**
 	 * @param{Environment} env
-	 * @returns{Type} 
+	 * @returns{Type}
 	 */</span>
 	_inferRho(env) {
 		<span class="hljs-keyword">this</span>.body.checkSigma(env, <span class="hljs-keyword">this</span>.type);

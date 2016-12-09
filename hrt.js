@@ -1,4 +1,4 @@
-// # `hrt.js`, A Rank-N Type Inference Algorithm
+// # `hrt.js`, A Rank-N Type Inferencer
 // 本文主要参照 Simon Peyton Jones 等的论文 *Practical type inference for arbitrary-rank types* 实现了一个 Rank-N 的类型推理算法。
 // 
 // 此算法的逻辑学表述可参见文献 31 页，Haskell 代码可参见其附件。这份 JavaScript 代码由其 Haskell 版本改写而来。
@@ -21,7 +21,7 @@ class Environment {
 		this.uniqs = uniqs;
 		this.variables = variables;
 	}
-	// #### extend :: this Environment × string × Type → Environment
+	// #### extend :: *this* Environment × string × Type → Environment
 	// 创建一个扩展环境 $\Gamma, x:t$，增加一个变量
 	/**
 	 * @param {string} name
@@ -32,7 +32,7 @@ class Environment {
 		v1.set(name, type);
 		return new Environment(this.uniqs, v1);
 	}
-	// #### extendN :: this Environment × [{name: string, type: Type}] → Environment
+	// #### extendN :: *this* Environment × [{name: string, type: Type}] → Environment
 	// 创建一个扩展环境 $\Gamma,\overline{x:t}$，增加一组变量。此函数用于 let rec 的构建
 	/**
 	 * @param {{name: string, type: Type}[]} terms
@@ -44,7 +44,7 @@ class Environment {
 		}
 		return new Environment(this.uniqs, v1);
 	}
-	// #### lookup :: this Environment × string → Type
+	// #### lookup :: *this* Environment × string → Type
 	// 查找名称定义
 	/**
 	 * @param {string} name
@@ -57,32 +57,32 @@ class Environment {
 			throw new Error(`Variable ${name} not found.`);
 		}
 	}
-	// #### newUnique :: this Environment → number
+	// #### newUnique :: *this* Environment → number
 	// 增加计数器，生成唯一性的数值
 	newUnique() {
 		this.uniqs.val += 1;
 		return this.uniqs.val;
 	}
-	// #### newMetaSlotVal :: this Environment → MetaSlotVal
+	// #### newMetaSlotVal :: *this* Environment → MetaSlotVal
 	// 生成新的 Meta slot value
 	newMetaSlotVal() {
 		const u = this.newUnique();
 		const ref = { val: null };
 		return new MetaSlotVal(u, ref);
 	}
-	// #### newSkolemVariable :: this Environment → string
+	// #### newSkolemVariable :: *this* Environment → string
 	// 生成新的 Skolem slot 名称
 	newSkolemVariable(s) {
 		const u = this.newUnique();
-		return rawNameToSkolemisedName(u, s);
+		return rawNameToskolmeizedName(u, s);
 	}
-	// #### getTypes :: this Environment → IterableIterator Type
+	// #### getTypes :: *this* Environment → IterableIterator Type
 	// 获得所有已定义变量的类型列表
 	getTypes() {
 		return this.variables.values();
 	}
 
-	// #### getTypes :: this Environment → IterableIterator [number, MetaSlot]
+	// #### getTypes :: *this* Environment → IterableIterator [number, MetaSlot]
 	// 获得当前环境中所有已定义变量类型中的所有 Meta slot
 	/**
 	 * @param{IterableIterator<Type>} tys
@@ -93,7 +93,7 @@ class Environment {
 			yield* type1.getMetaSlots();
 		}
 	}
-	// #### getTypes :: this Environment × → IterableIterator string
+	// #### getTypes :: *this* Environment × → IterableIterator string
 	// 获得当前环境中所有已定义变量类型中的所有自由 slot
 	/**
 	 * @param{IterableIterator<Type>} tys
@@ -106,10 +106,10 @@ class Environment {
 	}
 }
 
-function rawNameToSkolemisedName(u, n) {
+function rawNameToskolmeizedName(u, n) {
 	return "." + u + "." + n;
 }
-function rawNameOfSkolemisedName(n) {
+function rawNameOfskolmeizedName(n) {
 	return n.replace(/^\.\d+\./, "");
 }
 
@@ -122,20 +122,20 @@ function rawNameOfSkolemisedName(n) {
 // * Composite，表示一个复合类型，如 $\rm list\ int$。函数类型是一种二级复合。
 // * ForAll，表示一个多态量化 $\forall \overline\alpha. t$。
 // 
-// 此外在推理过程中，会涉及一种 Meta Slot，它代表一个尚未完全决议的类型。
+// 此外在推理过程中，会涉及一种 Meta Slot，它代表一个尚未完全决议的类型。使用这种方式处理推理中的中间结果最早可见于 Jones 的另一篇文献，*Boxy Types: Inference for Higher-Rank Types and Impredicativity*。
 // 
 // 我们将类型分为 $\sigma$, $\rho$, $\tau$ 三类，它们满足：
 // * $\tau \rightarrow \mathrm{Primitive}\ |\  a\ |\ \tau_1 \tau_2$
 // * $\rho \rightarrow \tau\ |\ \sigma_1 \sigma_2$
 // * $\sigma \rightarrow \forall \overline{a}.\rho$
 // 
-// 可以看出，$\sigma$ 类型为直接包含多态的类型，$\rho$ 类型则为嵌有多态结构的复合类型。在传统的 Hindley-Milner 系统中，$\rho$ 类型的第二种形式并不允许。
+// 可以看出，$\sigma$ 类型为直接包含多态的类型，$\rho$ 类型则为嵌有多态结构的复合类型。在传统的 Hindley-Milner 系统中，$\rho$ 类型的第二种形式并不允许，它和 $\tau$ 类型完全等价。
 class Type {
 	constructor() {}
-	// #### Pretty-print
+	// #### inspect :: *this* Type → string
 	inspect() {}
-	// #### getMetaSlots :: this Type → Map number MetaSlot
-	// 获取当前类型中所有出现的 Meta slot。返回一个 number 到 meta slot 的映射
+	// #### getMetaSlots :: *this* Type → Map number MetaSlot
+	// 获取当前类型中所有出现的 Meta slot。返回一个 id 到 meta slot 的映射。根据 Meta slot value 的定义，任何两个 id 相同的 Meta slot 都视作相等。
 	/**
 	 * @returns {Map<number, MetaSlot>}
 	 */
@@ -145,8 +145,8 @@ class Type {
 		return a;
 	}
 	_getMetaSlots(a) {}
-	// #### getFreeSlots :: this Type → Set string
-	// 获取当前类型中所有出现的未绑定 slot。
+	// #### getFreeSlots :: *this* Type → Set string
+	// 获取当前类型中所有出现的未绑定 slot。返回它们的名字组成的集合。
 	/**
 	 * Get all free slots
 	 * @returns{Set<string>}
@@ -158,8 +158,8 @@ class Type {
 		return a;
 	}
 	_getFreeSlots(bound, a) {}
-	// #### getBinders :: this Type → Set string
-	// 获取当前类型中所有 forall 使用的 binder
+	// #### getBinders :: *this* Type → Set string
+	// 获取当前类型中所有被 forall 使用的 slot 名字。返回其集合。
 	/**
 	 * @returns{Set<string>}
 	 */
@@ -169,8 +169,8 @@ class Type {
 		return a;
 	}
 	_getBinders() {}
-	// #### subst :: this Type × Map string Type → Type
-	// 根据 m 的要求，替换一些 slot 的内容
+	// #### subst :: *this* Type × Map string Type → Type
+	// 根据 m 的要求，替换一些 slot 的内容。
 	/**
 	 * @param {Map<string, Type>} m
 	 * @returns {Type}
@@ -178,7 +178,7 @@ class Type {
 	subst(m) {
 		return this;
 	}
-	// #### instantiate :: this Type × Environment → Type
+	// #### instantiate :: *this* Type × Environment → Type
 	// 在环境 env 中，实例化当前的多态类型。它会去除顶层的 $\forall$ 符号。
 	/**
 	 * @param {Environment} env
@@ -187,21 +187,21 @@ class Type {
 	instantiate(env) {
 		return this;
 	}
-	// #### skolemise :: this Type × Environment → {map: Map string Slot, type: Type}
+	// #### skolmeize :: *this* Type × Environment → {map: Map string Slot, type: Type}
 	// 在当前环境 env 中，产生当前类型的一个斯科伦范式形式。它可以看作实例化的递归版本，会展开每一层的多态，同时会返回新产生的临时变量的表（这里使用一个名字到 Slot 的 Map 实现）。我们不会展开复合类型的前件，避免错误地捕捉变量。此过程产生的类型必然保证：所有符合构造的后件不包含任何的多态。
 	// 
-	// 一个实例是：$\mathrm{skolmeise}(\forall a.a\rightarrow(\forall b.b\rightarrow b))=\forall t_1 t_2. t_1 \rightarrow (t_2 \rightarrow t_2)$
+	// 一个实例是：$\mathrm{skol}(\forall a.a\rightarrow(\forall b.b\rightarrow b))=\forall ab. a \rightarrow (b \rightarrow b)$
 	/**
 	 * @param {Environment} env
 	 * @returns {{map: Map<string, Slot>, type: Type}}
 	 */
-	skolemise(env) {
+	skolmeize(env) {
 		return {
 			map: new Map(),
 			type: this
 		};
 	}
-	// #### generalize :: this Type × Environment × [MetaSlotVal] → ForAll
+	// #### generalize :: *this* Type × Environment × [MetaSlotVal] → ForAll
 	// 在当前环境 env 中，根据 mvs 列表泛化当前类型。将返回一个多态类型。
 	/**
 	 * @param {Environment} env
@@ -219,7 +219,7 @@ class Type {
 		}
 		return new ForAll(newBinders.map(x => x.name), this.zonk(env));
 	}
-	// #### zonk :: this Type × Environment → Type
+	// #### zonk :: *this* Type × Environment → Type
 	// 消除掉当前类型中所有的 Meta Slot。
 	/**
 	 * @param {Environment} env
@@ -228,7 +228,7 @@ class Type {
 	zonk(env) {
 		return this;
 	}
-	// #### instSigmaInfer :: this Type × Environment → Type
+	// #### instSigmaInfer :: *this* Type × Environment → Type
 	// 在类型推理时，生成一个实例化的版本
 	//
 	// INFER-INST: $\dfrac{}{\forall \overline a. \rho \le \sim [\overline{a\rightarrow\mathrm{fresh}}]\rho}$
@@ -239,7 +239,7 @@ class Type {
 	instSigmaInfer(env) {
 		return this.instantiate(env);
 	}
-	// #### instSigmaCheck :: this Type × Environment × Type → boolean
+	// #### instSigmaCheck :: *this* Type × Environment × Type → boolean
 	// 在类型推理时，检查本类型是否符合需求
 	/**
 	 * @param{Environment} env
@@ -248,7 +248,7 @@ class Type {
 	instSigmaCheck(env, expected) {
 		return this.subsCheckRho(env, expected);
 	}
-	// #### subsCheck :: this Type × Environment × Type → boolean <br> subsCheckRho :: this Type × Environment × Type → boolean
+	// #### subsCheck :: *this* Type × Environment × Type → boolean <br> subsCheckRho :: *this* Type × Environment × Type → boolean
 	// 判断某个类型是否比另一个类型更加「泛化」。
 	// 我们把它拆分成两个部分：$\rm subsCheck$ 和 $\rm subsCheckRho$，前者处理两个 $\sigma$ 类型，后者处理一个 $\sigma$ 类型和一个 $\rho$ 类型。
 	/**
@@ -257,7 +257,7 @@ class Type {
 	 */
 	subsCheck(env, that) {
 		// $\sigma_1 \le \sigma_2$ 成立，当且仅当：
-		const {map: skolTvs, type: rho2} = that.skolemise(env);
+		const {map: skolTvs, type: rho2} = that.skolmeize(env);
 		//  - $\sigma_1 \le \rho, \forall \overline a. \rho = \mathrm{skol}(\sigma_2)$
 		this.subsCheckRho(env, rho2);
 		//  - 并且，$\sigma_1$ 的自由变量中，$\sigma_2$ 中的对应者没有被「提出来」
@@ -265,7 +265,7 @@ class Type {
 		//    $\overline a \not\in \mathrm{free}(\sigma_1)$
 		const escTvs = new Set(env.getAllFreeSlots([this]));
 		for (let [k, v] of skolTvs) {
-			if (escTvs.has(rawNameOfSkolemisedName(k))) {
+			if (escTvs.has(rawNameOfskolmeizedName(k))) {
 				throw "Subsumption check failed"
 			}
 		}
@@ -356,7 +356,7 @@ class Slot extends Type {
 	}
 	equalTo(that) {
 		if (this.isSkolem() && that.isSkolem()) {
-			return rawNameOfSkolemisedName(this.name) === rawNameOfSkolemisedName(that.name);
+			return rawNameOfskolmeizedName(this.name) === rawNameOfskolmeizedName(that.name);
 		} else if (!this.isSkolem() && !that.isSkolem()) {
 			return this.name === that.name;
 		} else {
@@ -414,8 +414,8 @@ class Composite extends Type {
 		return new Composite(this.fn.subst(m), this.arg.subst(m), this.contravariant);
 	}
 	// 复合类型的斯科伦化不会向内继续展开
-	skolemise(env) {
-		let {map: m1, type: t1} = this.arg.skolemise(env);
+	skolmeize(env) {
+		let {map: m1, type: t1} = this.arg.skolmeize(env);
 		return {
 			map: m1,
 			type: new Composite(this.fn, t1, this.contravariant)
@@ -488,7 +488,7 @@ class ForAll extends Type {
 	/**
 	 * @param {Environment} env
 	 */
-	skolemise(env) {
+	skolmeize(env) {
 		let m = new Map();
 		let mSub = new Map();
 		for (let q of this.quantifiers) {
@@ -497,7 +497,7 @@ class ForAll extends Type {
 			m.set(sv, ss);
 			mSub.set(q, ss);
 		}
-		let {map: m1, type: t1} = this.body.subst(mSub).skolemise(env);
+		let {map: m1, type: t1} = this.body.subst(mSub).skolmeize(env);
 		for (let [k, v] of m1.entries()) {
 			m.set(k, v);
 		}
@@ -689,7 +689,7 @@ class Term {
 	isAtomic() {
 		return false;
 	}
-	// #### checkRho :: this Term × Environment × Type → boolean
+	// #### checkRho :: *this* Term × Environment × Type → boolean
 	// 在环境 env 中检查当前表达式是否符合 $\rho$ 类型 type
 	//
 	// $\Gamma\vdash t : \rho$
@@ -701,7 +701,7 @@ class Term {
 	checkRho(env, type) {
 		return this._checkRho(env, type);
 	}
-	// #### inferRho :: this Term × Environment → Type
+	// #### inferRho :: *this* Term × Environment → Type
 	// 在环境 env 中推理，尝试得到 $\rho$ 类型（或者报错）
 	//
 	// $\Gamma\vdash t :\sim \rho$
@@ -716,31 +716,31 @@ class Term {
 		return t;
 	}
 
-	// #### checkSigma :: this Term × Environment × Type → boolean
+	// #### checkSigma :: *this* Term × Environment × Type → boolean
 	// 在环境 env 中检查当前表达式是否符合 $\sigma$ 类型 type
 	//
-	// CHECK-SIGMA:$\dfrac{\overline a \not\in \mathrm{free}(\Gamma)\quad \Gamma\vdash t:\rho\quad \forall\overline a.\rho = \mathrm{skol}(\sigma)}{\Gamma\vdash^* t:\sigma}$
+	// CHECK-SIGMA: $\dfrac{\overline a \not\in \mathrm{free}(\Gamma)\quad \Gamma\vdash t:\rho\quad \forall\overline a.\rho = \mathrm{skol}(\sigma)}{\Gamma\vdash^* t:\sigma}$
 	/**
 	 * @param{Environment} env
 	 * @param{Type} sigma
 	 */
 	checkSigma(env, type) {
-		const {map: mvs, type: rho} = type.skolemise(env);
+		const {map: mvs, type: rho} = type.skolmeize(env);
 		this.checkRho(env, rho);
 		const envTys = env.getTypes();
 		const escTvs = new Set(env.getAllFreeSlots(envTys));
 		for (let [name, slot] of mvs) {
-			if (escTvs.has(rawNameOfSkolemisedName(name))) {
+			if (escTvs.has(rawNameOfskolmeizedName(name))) {
 				throw "Type is not polymorphic enough"
 			}
 		}
 		return true;
 	}
 
-	// #### inferSigma :: this Term × Environment → Type
+	// #### inferSigma :: *this* Term × Environment → Type
 	// 在环境 env 中推理，尝试得到 $\sigma$ 类型（或者报错）
 	//
-	// INFER-SIGMA:$\dfrac{\overline a = \mathrm{free}(\rho)-\mathrm{free}(\Gamma)\quad \Gamma\vdash t:\sim \rho}{\Gamma\vdash^* t:\sim\forall\overline a.\rho}$
+	// INFER-SIGMA: $\dfrac{\overline a = \mathrm{free}(\rho)-\mathrm{free}(\Gamma)\quad \Gamma\vdash t:\sim \rho}{\Gamma\vdash^* t:\sim\forall\overline a.\rho}$
 	/**
 	 * @param{Environment} env
 	 * @returns{Type}
@@ -968,7 +968,7 @@ class Ann extends Term {
 	// INFER-ANN: $\dfrac{\Gamma\vdash^* t:\sigma \quad \sigma\le\sim\rho}{\Gamma\vdash(t:\sigma):\sim\rho}$
 	/**
 	 * @param{Environment} env
-	 * @returns{Type} 
+	 * @returns{Type}
 	 */
 	_inferRho(env) {
 		this.body.checkSigma(env, this.type);

@@ -1,12 +1,13 @@
 /*--------------------- Layout ----------------------------*/
 html { height: 100%; }
 body {
-  font-family: sans-serif;
+  font-family: "Cormorant Garamond", 'Times New Roman', Times, "ZSung", serif;
   font-size: 14px;
-  line-height: 18px;
+  line-height: 1.5;
   color: #30404f;
   margin: 0; padding: 0;
   height:100%;
+  font-feature-settings: "lnum" 1;
 }
 #container { min-height: 100%; }
 
@@ -25,8 +26,6 @@ p {
     margin: 25px 0;
   }
     .annotation ul li, .annotation ol li {
-      font-size: 14px;
-      line-height: 18px;
       margin: 10px 0;
     }
 
@@ -38,12 +37,15 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 h1 {
+  font-family: "Cormorant", 'Times New Roman', Times, "ZSung", serif;
   margin-top: 40px;
+  font-size: 2.25em;
 }
 h2 {
+  font-family: "Cormorant", 'Times New Roman', Times, "ZSung", serif;
   font-size: 1.5em;
 }
-.pilwrap + p, .pilwrap+h2,.pilwrap+h3,.pilwrap+h4{
+.pilwrap + p, .pilwrap+h2,.pilwrap+h3,.pilwrap+h4, .pilwrap+ul, .pilwrap+ol{
   margin-top: 0;
 }
 
@@ -55,10 +57,11 @@ hr {
 }
 
 pre, tt, code {
-  font-size: 12px; line-height: 16px;
-  font-family: Iosevka, Menlo, Monaco, Consolas, "Lucida Console", monospace;
+  font-size: 1em; line-height: 1.375;
+  font-family: Iosevka Slab, Fira Code, Fira Mono, Monaco, Consolas, "Lucida Console", monospace;
   margin: 0; padding: 0;
-  tab-size: 4
+  tab-size: 4;
+  font-feature-settings: "lnum" 1, "calt" 1, "XJS_" 1;
 }
   .annotation pre {
     display: block;
@@ -177,7 +180,8 @@ ul.sections > li > div {
   background: #f5f5ff;
 }
 
-#jump_page .source:first-child {
+div.content pre {
+  font-size: 85%;
 }
 
 /*---------------------- Low resolutions (> 320px) ---------------------*/
@@ -208,10 +212,7 @@ ul.sections > li > div {
   }
 
   ul.sections > li > div.annotation p tt, .annotation code {
-    background: #f8f8ff;
-    border: 1px solid #dedede;
-    font-size: 1em;
-    padding: 0 0.2em;
+    color:#19469D
   }
 }
 
@@ -223,10 +224,6 @@ ul.sections > li > div {
   body {
     background-color: #F5F5FF;
     font-size: 15px;
-    line-height: 21px;
-  }
-  pre, tt, code {
-    line-height: 18px;
   }
   p, ul, ol {
     margin: 0 0 15px;
@@ -331,11 +328,11 @@ ul.sections > li > div {
 @media only screen and (min-width: 1025px) {
 
   #background {
-    width: 525px;
+    width: 625px;
   }
   ul.sections > li > div.annotation {
-    max-width: 525px;
-    min-width: 525px;
+    max-width: 625px;
+    min-width: 625px;
     padding: 10px 25px 1px 50px;
   }
   ul.sections > li > div.content {
