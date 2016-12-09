@@ -1,0 +1,1793 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+  <title>`hrt.js`, A Rank-N Type Inference Algorithm</title>
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, target-densitydpi=160dpi, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+  <link rel="stylesheet" media="all" href="docco.css" />
+  <script type="text/x-mathjax-config">
+       MathJax.Hub.Config({
+    tex2jax: {
+      inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+      processEscapes: true
+    }
+  });
+    </script>
+  <script type="text/javascript" async src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML">
+</script>
+</head>
+<body>
+  <div id="container">
+    <div id="background"></div>
+    
+    <ul class="sections">
+        
+        
+        
+        <li id="section-1">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-1">&#182;</a>
+              </div>
+              <h1 id="-hrt-js-a-rank-n-type-inference-algorithm"><code>hrt.js</code>, A Rank-N Type Inference Algorithm</h1>
+<p>本文主要参照 Simon Peyton Jones 等的论文 <em>Practical type inference for arbitrary-rank types</em> 实现了一个 Rank-N 的类型推理算法。</p>
+<p>此算法的逻辑学表述可参见文献 31 页，Haskell 代码可参见其附件。这份 JavaScript 代码由其 Haskell 版本改写而来。</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>
+<span class="hljs-keyword">const</span> util = <span class="hljs-built_in">require</span>(<span class="hljs-string">"util"</span>);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-2">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-2">&#182;</a>
+              </div>
+              <h2 id="-gamma-">第一部分，环境 $\Gamma$</h2>
+<p>我们使用「环境」来处理嵌套的作用域。每个环境包含两个部分：</p>
+<ul>
+<li>uniqs：一个全局的计数器引用，产生临时变量时使用</li>
+<li>variables：一个字符串到类型的映射，用来记录所有已经定型的变量名</li>
+</ul>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Environment</span> </span>{
+	<span class="hljs-comment">/**
+	 * @param {{val:number}} uniqs
+	 * @param {Map&lt;string, Type&gt;} variables
+	 */</span>
+	<span class="hljs-keyword">constructor</span>(uniqs, variables) {
+		<span class="hljs-keyword">this</span>.uniqs = uniqs;
+		<span class="hljs-keyword">this</span>.variables = variables;
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-3">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-3">&#182;</a>
+              </div>
+              <p>创建一个扩展环境 $(x:t)\Gamma$，增加一个变量</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-comment">/**
+	 * @param {string} name
+	 * @param {Type} type
+	 */</span>
+	extend(name, type) {
+		<span class="hljs-keyword">let</span> v1 = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Map</span>(<span class="hljs-keyword">this</span>.variables);
+		v1.set(name, type);
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Environment(<span class="hljs-keyword">this</span>.uniqs, v1);
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-4">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-4">&#182;</a>
+              </div>
+              <p>创建一个扩展环境 $(\overline{x:t})\Gamma$，增加一组变量。此函数用于 let rec 的构建</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-comment">/**
+	 * @param {{name: string, type: Type}[]} terms
+	 */</span>
+	extendN(terms) {
+		<span class="hljs-keyword">let</span> v1 = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Map</span>(<span class="hljs-keyword">this</span>.variables);
+		<span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> {name, type} <span class="hljs-keyword">of</span> terms) {
+			v1.set(name, type);
+		}
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Environment(<span class="hljs-keyword">this</span>.uniqs, v1);
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-5">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-5">&#182;</a>
+              </div>
+              <p>查找名称定义</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-comment">/**
+	 * @param {string} name
+	 * @returns {Type}
+	 */</span>
+	lookup(name) {
+		<span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.variables.has(name)) {
+			<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.variables.get(name);
+		} <span class="hljs-keyword">else</span> {
+			<span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-built_in">Error</span>(<span class="hljs-string">`Variable <span class="hljs-subst">${name}</span> not found.`</span>);
+		}
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-6">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-6">&#182;</a>
+              </div>
+              <p>生成计数器</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	newUnique() {
+		<span class="hljs-keyword">this</span>.uniqs.val += <span class="hljs-number">1</span>;
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.uniqs.val;
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-7">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-7">&#182;</a>
+              </div>
+              <p>生成新的 Meta slot value</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	newMetaSlotVal() {
+		<span class="hljs-keyword">const</span> u = <span class="hljs-keyword">this</span>.newUnique();
+		<span class="hljs-keyword">const</span> ref = { <span class="hljs-attr">val</span>: <span class="hljs-literal">null</span> };
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> MetaSlotVal(u, ref);
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-8">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-8">&#182;</a>
+              </div>
+              <p>生成新的 Skolem slot 名称</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	newSkolemVariable(s) {
+		<span class="hljs-keyword">const</span> u = <span class="hljs-keyword">this</span>.newUnique();
+		<span class="hljs-keyword">return</span> rawNameToSkolemisedName(u, s);
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-9">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-9">&#182;</a>
+              </div>
+              <p>获得所有已定义变量的类型列表</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	getTypes() {
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.variables.values();
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-10">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-10">&#182;</a>
+              </div>
+              <p>获得当前环境中所有已定义变量类型中的所有 Meta slot</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-comment">/**
+	 * @param{IterableIterator&lt;Type&gt;} tys
+	 */</span>
+	* getMetaSlotVars(tys) {
+		<span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> type <span class="hljs-keyword">of</span> tys) {
+			<span class="hljs-keyword">let</span> type1 = type.zonk(<span class="hljs-keyword">this</span>);
+			<span class="hljs-keyword">yield</span>* type1.getMetaSlots();
+		}
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-11">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-11">&#182;</a>
+              </div>
+              <p>获得当前环境中所有已定义变量类型中的所有自由 slot</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-comment">/**
+	 * @param{IterableIterator&lt;Type&gt;} tys
+	 */</span>
+	* getAllFreeSlots(tys) {
+		<span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> type <span class="hljs-keyword">of</span> tys) {
+			<span class="hljs-keyword">let</span> type1 = type.zonk(<span class="hljs-keyword">this</span>);
+			<span class="hljs-keyword">yield</span>* type1.getFreeSlots();
+		}
+	}
+}
+
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">rawNameToSkolemisedName</span>(<span class="hljs-params">u, n</span>) </span>{
+	<span class="hljs-keyword">return</span> <span class="hljs-string">"."</span> + u + <span class="hljs-string">"."</span> + n;
+}
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">rawNameOfSkolemisedName</span>(<span class="hljs-params">n</span>) </span>{
+	<span class="hljs-keyword">return</span> n.replace(<span class="hljs-regexp">/^\.\d+\./</span>, <span class="hljs-string">""</span>);
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-12">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-12">&#182;</a>
+              </div>
+              <h2 id="-">第二部分，类型</h2>
+<p>在我们的系统中，「类型」可以包含四种构造：</p>
+<ul>
+<li>Slot，表示一个被量化的名称，使用符号 $a$ 表示。</li>
+<li>Primitive，表示一个原始类型，如 $\rm int$。</li>
+<li>Composite，表示一个复合类型，如 $\rm list\ int$。函数类型是一种二级复合。</li>
+<li>ForAll，表示一个多态量化 $\forall \overline\alpha. t$。</li>
+</ul>
+<p>此外在推理过程中，会涉及一种 Meta Slot，它代表一个尚未完全决议的类型。</p>
+<p>我们将类型分为 $\sigma$, $\rho$, $\tau$ 三类，它们满足：</p>
+<ul>
+<li>$\tau \rightarrow \mathrm{Primitive}\ |\  a\ |\ \tau_1 \tau_2$</li>
+<li>$\rho \rightarrow \tau\ |\ \sigma_1 \sigma_2$</li>
+<li>$\sigma \rightarrow \forall \overline{a}.\rho$</li>
+</ul>
+<p>可以看出，$\sigma$ 类型为直接包含多态的类型，$\rho$ 类型则为嵌有多态结构的复合类型。在传统的 Hindley-Milner 系统中，$\rho$ 类型的第二种形式并不允许。</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Type</span> </span>{
+	<span class="hljs-keyword">constructor</span>() {}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-13">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-13">&#182;</a>
+              </div>
+              <h4 id="pretty-print">Pretty-print</h4>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	inspect() {}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-14">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-14">&#182;</a>
+              </div>
+              <h4 id="getmetaslots">getMetaSlots</h4>
+<p>获取当前类型中所有出现的 Meta slot。返回一个 number 到 meta slot 的映射</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-comment">/**
+	 * @returns {Map&lt;number, Type&gt;}
+	 */</span>
+	getMetaSlots() {
+		<span class="hljs-keyword">let</span> a = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Map</span>;
+		<span class="hljs-keyword">this</span>._getMetaSlots(a);
+		<span class="hljs-keyword">return</span> a;
+	}
+	_getMetaSlots(a) {}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-15">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-15">&#182;</a>
+              </div>
+              <h4 id="getfreeslots">getFreeSlots</h4>
+<p>获取当前类型中所有出现的未绑定 slot。</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-comment">/**
+	 * Get all free slots
+	 * @returns{Set&lt;string&gt;}
+	 */</span>
+	getFreeSlots() {
+		<span class="hljs-keyword">let</span> a = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Set</span>;
+		<span class="hljs-keyword">let</span> bound = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Set</span>;
+		<span class="hljs-keyword">this</span>._getFreeSlots(bound, a);
+		<span class="hljs-keyword">return</span> a;
+	}
+	_getFreeSlots(bound, a) {}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-16">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-16">&#182;</a>
+              </div>
+              <p>获取当前类型中所有 forall 使用的 binder</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-comment">/**
+	 * @returns{Set&lt;string&gt;}
+	 */</span>
+	getBinders() {
+		<span class="hljs-keyword">let</span> a = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Set</span>;
+		<span class="hljs-keyword">this</span>._getBinders(a);
+		<span class="hljs-keyword">return</span> a;
+	}
+	_getBinders() {}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-17">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-17">&#182;</a>
+              </div>
+              <p>根据 m 的要求，替换一些 slot 的内容</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-comment">/**
+	 * @param {Map&lt;string, Type&gt;} m
+	 * @returns {Type}
+	 */</span>
+	subst(m) {
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>;
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-18">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-18">&#182;</a>
+              </div>
+              <h4 id="-">实例化</h4>
+<p>在环境 env 中，实例化当前的多态类型。它会去除顶层的 $\forall$ 符号。</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-comment">/**
+	 * @param {Environment} env
+	 * @returns {Type}
+	 */</span>
+	instantiate(env) {
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>;
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-19">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-19">&#182;</a>
+              </div>
+              <h4 id="-">深斯科伦化</h4>
+<p>在当前环境 env 中，产生当前类型的一个斯科伦范式形式。它可以看作实例化的递归版本，会展开每一层的多态，同时会返回新产生的临时变量的表（这里使用一个名字到 Slot 的 Map 实现）。我们不会展开复合类型的前件，避免错误地捕捉变量。此过程产生的类型必然保证：所有符合构造的后件不包含任何的多态。</p>
+<p>一个实例是：$\mathrm{skolmeise}(\forall a.a\rightarrow(\forall b.b\rightarrow b))=\forall t_1 t_2. t_1 \rightarrow (t_2 \rightarrow t_2)$</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-comment">/**
+	 * @param {Environment} env
+	 * @returns {{map: Map&lt;string, Slot&gt;, type: Type}}
+	 */</span>
+	skolemise(env) {
+		<span class="hljs-keyword">return</span> {
+			<span class="hljs-attr">map</span>: <span class="hljs-keyword">new</span> <span class="hljs-built_in">Map</span>(),
+			<span class="hljs-attr">type</span>: <span class="hljs-keyword">this</span>
+		};
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-20">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-20">&#182;</a>
+              </div>
+              <h4 id="-">泛化</h4>
+<p>在当前环境 env 中，根据 mvs 列表泛化当前类型。将返回一个多态类型。</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-comment">/**
+	 * @param {Environment} env
+	 * @param {Array&lt;MetaSlotVal&gt;} mvs
+	 * @returns {ForAll}
+	 */</span>
+	quantify(env, mvs) {
+		<span class="hljs-keyword">let</span> usedBinders = <span class="hljs-keyword">this</span>.getBinders();
+		<span class="hljs-keyword">let</span> nRef = { <span class="hljs-attr">val</span>: <span class="hljs-number">0</span> };
+		<span class="hljs-keyword">let</span> newBinders = [];
+		<span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> slot <span class="hljs-keyword">of</span> mvs) {
+			<span class="hljs-keyword">let</span> newBinder = <span class="hljs-keyword">new</span> Slot(generateBinder(nRef, usedBinders));
+			slot.typeRef.val = newBinder;
+			newBinders.push(newBinder);
+		}
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> ForAll(newBinders.map(<span class="hljs-function"><span class="hljs-params">x</span> =&gt;</span> x.name), <span class="hljs-keyword">this</span>.zonk(env));
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-21">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-21">&#182;</a>
+              </div>
+              <h4 id="-zonking-">简化（Zonking）</h4>
+<p>消除掉当前类型中所有的 Meta Slot。</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-comment">/**
+	 * @param {Environment} env
+	 * @returns {Type}
+	 */</span>
+	zonk(env) {
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>;
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-22">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-22">&#182;</a>
+              </div>
+              <h4 id="sigma-">Sigma-实例化</h4>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-comment">/**
+	 * @param{Environment} env
+	 * @returns{Type}
+	 */</span>
+	instSigmaInfer(env, exp) {
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.instantiate(env);
+	}
+	<span class="hljs-comment">/**
+	 * @param{Environment} env
+	 * @param{Type} expected
+	 */</span>
+	instSigmaCheck(env, expected) {
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.subsCheckRho(env, expected);
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-23">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-23">&#182;</a>
+              </div>
+              <h4 id="-">小前提检查</h4>
+<p>判断某个类型是否比另一个类型更加「泛化」。
+我们把它拆分成两个部分：$\rm subsCheck$ 和 $\rm subsCheckRho$，前者处理两个 $\sigma$ 类型，后者处理一个 $\sigma$ 类型和一个 $\rho$ 类型。</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-comment">/**
+	 * @param{Environment} env
+	 * @param{Type} that
+	 */</span>
+	subsCheck(env, that) {</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-24">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-24">&#182;</a>
+              </div>
+              <p>${\rm subsCheck}(\sigma_1, \sigma_2)$ 成立，当且仅当：</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		<span class="hljs-keyword">const</span> {<span class="hljs-attr">map</span>: skolTvs, <span class="hljs-attr">type</span>: rho2} = that.skolemise(env);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-25">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-25">&#182;</a>
+              </div>
+              <p>${\rm subsCheckRho}(\sigma_1, \mathrm{skolmeise}(\sigma_2).\mathrm{type}) $</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		<span class="hljs-keyword">this</span>.subsCheckRho(env, rho2);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-26">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-26">&#182;</a>
+              </div>
+              <p>并且，$\sigma_1$ 的自由变量中，$\sigma_2$ 中的对应者没有被「提出来」。</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		<span class="hljs-keyword">const</span> escTvs = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Set</span>(env.getAllFreeSlots([<span class="hljs-keyword">this</span>]));
+		<span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> [k, v] <span class="hljs-keyword">of</span> skolTvs) {
+			<span class="hljs-keyword">if</span> (escTvs.has(rawNameOfSkolemisedName(k))) {
+				<span class="hljs-keyword">throw</span> <span class="hljs-string">"Subsumption check failed"</span>
+			}
+		}
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-27">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-27">&#182;</a>
+              </div>
+              <p>${\rm subsCheckRho}(\sigma, \rho)$ 将会检查是否 $\sigma$ 比 $\rho$ 更加泛化。</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-comment">/**
+	 * @param{Environment} env
+	 * @param{Type} that
+	 */</span>
+	subsCheckRho(env, that) {
+		<span class="hljs-keyword">if</span> (that <span class="hljs-keyword">instanceof</span> Composite) {
+			<span class="hljs-keyword">const</span> [f1, a1] = unifyComposite(<span class="hljs-keyword">this</span>, env);
+			<span class="hljs-keyword">return</span> subsCheckComposite(env, that.contravariant, f1, that.fn, a1, that.arg);
+		} <span class="hljs-keyword">else</span> {
+			<span class="hljs-keyword">return</span> unify(<span class="hljs-keyword">this</span>, that);
+		}
+	}
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-28">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-28">&#182;</a>
+              </div>
+              <p>复合类型的小前提检查，注意反变性</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">subsCheckComposite</span>(<span class="hljs-params">env, contravariant, f1, f2, a1, a2</span>) </span>{
+	f1.subsCheck(env, f2);
+	<span class="hljs-keyword">if</span> (contravariant) {
+		a2.subsCheckRho(env, a1);
+	} <span class="hljs-keyword">else</span> {
+		a1.subsCheckRho(env, a2);
+	}
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-29">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-29">&#182;</a>
+              </div>
+              <p>获取新的名字，用于泛化过程中的重命名</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">generateBinder</span>(<span class="hljs-params">nRef, used</span>) </span>{
+	nRef.val += <span class="hljs-number">1</span>;
+	<span class="hljs-keyword">let</span> name = <span class="hljs-string">"t"</span> + nRef.val;
+	<span class="hljs-keyword">while</span> (used.has(name)) {
+		nRef.val += <span class="hljs-number">1</span>;
+		name = <span class="hljs-string">"t"</span> + nRef.val;
+	}
+	<span class="hljs-keyword">return</span> name;
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-30">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-30">&#182;</a>
+              </div>
+              <h3 id="-">基本类型</h3>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Primitive</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Type</span> </span>{
+	<span class="hljs-comment">/**
+	 * @param {string} name
+	 */</span>
+	<span class="hljs-keyword">constructor</span>(name) {
+		<span class="hljs-keyword">super</span>();
+		<span class="hljs-keyword">this</span>.name = name;
+	}
+	inspect() {
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.name;
+	}
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-31">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-31">&#182;</a>
+              </div>
+              <h3 id="-a-">限制的类型变量，$a$</h3>
+<p>Slot 可能有两种来源：</p>
+<ul>
+<li>在外面某个 $\forall$ 之后出现</li>
+<li>由斯科伦化产生</li>
+</ul>
+<p>我们使用名字区分之，名称以 <code>.</code> 开头的都是由斯科伦化产生产生的 Slot</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Slot</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Type</span> </span>{
+	<span class="hljs-comment">/**
+	 * @param {string} name
+	 */</span>
+	<span class="hljs-keyword">constructor</span>(name) {
+		<span class="hljs-keyword">super</span>();
+		<span class="hljs-keyword">this</span>.name = name;
+	}
+	inspect() {
+		<span class="hljs-keyword">return</span> <span class="hljs-string">"'"</span> + <span class="hljs-keyword">this</span>.name;
+	}
+	_getFreeSlots(bound, a) {
+		<span class="hljs-keyword">if</span> (!bound.has(<span class="hljs-keyword">this</span>.name) &amp;&amp; !a.has(<span class="hljs-keyword">this</span>.name)) {
+			a.add(<span class="hljs-keyword">this</span>.name);
+		}
+	}
+	subst(m) {
+		<span class="hljs-keyword">if</span> (m.has(<span class="hljs-keyword">this</span>.name)) {
+			<span class="hljs-keyword">return</span> m.get(<span class="hljs-keyword">this</span>.name);
+		} <span class="hljs-keyword">else</span> {
+			<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>;
+		}
+	}
+	isSkolem() {
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.name[<span class="hljs-number">0</span>] === <span class="hljs-string">"."</span>;
+	}
+	equalTo(that) {
+		<span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.isSkolem() &amp;&amp; that.isSkolem()) {
+			<span class="hljs-keyword">return</span> rawNameOfSkolemisedName(<span class="hljs-keyword">this</span>.name) === rawNameOfSkolemisedName(that.name);
+		} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (!<span class="hljs-keyword">this</span>.isSkolem() &amp;&amp; !that.isSkolem()) {
+			<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.name === that.name;
+		} <span class="hljs-keyword">else</span> {
+			<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>;
+		}
+	}
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-32">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-32">&#182;</a>
+              </div>
+              <h3 id="-sigma_1-sigma_2-">复合类型，$\sigma_1 \sigma_2$</h3>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Composite</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Type</span> </span>{</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-33">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-33">&#182;</a>
+              </div>
+              <p>复合类型由三个部分构成：</p>
+<ul>
+<li>构造器部分，<em>fn</em></li>
+<li>参数部分，<em>arg</em></li>
+<li>协变/反变性，<em>contravariant</em></li>
+</ul>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-comment">/**
+	 * @param {Type} fn
+	 * @param {Type} arg
+	 * @param {boolean} contravariant
+	 */</span>
+	<span class="hljs-keyword">constructor</span>(fn, arg, contravariant) {
+		<span class="hljs-keyword">super</span>();
+		<span class="hljs-keyword">this</span>.fn = fn;
+		<span class="hljs-keyword">this</span>.arg = arg;
+		<span class="hljs-keyword">this</span>.contravariant = contravariant || <span class="hljs-literal">false</span>;
+	}
+	inspect() {
+		<span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.fn <span class="hljs-keyword">instanceof</span> Composite &amp;&amp; <span class="hljs-keyword">this</span>.fn.fn <span class="hljs-keyword">instanceof</span> Primitive &amp;&amp; !<span class="hljs-regexp">/^\w/</span>.test(<span class="hljs-keyword">this</span>.fn.fn.name)) {
+			<span class="hljs-keyword">const</span> left = <span class="hljs-keyword">this</span>.fn.arg;
+			<span class="hljs-keyword">const</span> op = <span class="hljs-keyword">this</span>.fn.fn;
+			<span class="hljs-keyword">if</span> (left <span class="hljs-keyword">instanceof</span> Primitive || left <span class="hljs-keyword">instanceof</span> Slot) {
+				<span class="hljs-keyword">return</span> left.inspect() + <span class="hljs-string">" "</span> + op.name + <span class="hljs-string">" "</span> + <span class="hljs-keyword">this</span>.arg.inspect();
+			} <span class="hljs-keyword">else</span> {
+				<span class="hljs-keyword">return</span> <span class="hljs-string">"("</span> + left.inspect() + <span class="hljs-string">") "</span> + op.name + <span class="hljs-string">" "</span> + <span class="hljs-keyword">this</span>.arg.inspect();
+			}
+		} <span class="hljs-keyword">else</span> {
+			<span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.arg <span class="hljs-keyword">instanceof</span> Primitive || <span class="hljs-keyword">this</span>.arg <span class="hljs-keyword">instanceof</span> Slot) {
+				<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.fn.inspect() + <span class="hljs-string">" "</span> + <span class="hljs-keyword">this</span>.arg.inspect();
+			} <span class="hljs-keyword">else</span> {
+				<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.fn.inspect() + <span class="hljs-string">" ("</span> + <span class="hljs-keyword">this</span>.arg.inspect() + <span class="hljs-string">")"</span>;
+			}
+		}
+	}
+	_getMetaSlots(a) {
+		<span class="hljs-keyword">this</span>.fn._getMetaSlots(a);
+		<span class="hljs-keyword">this</span>.arg._getMetaSlots(a);
+	}
+	_getFreeSlots(bound, a) {
+		<span class="hljs-keyword">this</span>.fn._getFreeSlots(bound, a);
+		<span class="hljs-keyword">this</span>.arg._getFreeSlots(bound, a);
+	}
+	_getBinders(a) {
+		<span class="hljs-keyword">this</span>.fn._getBinders(a);
+		<span class="hljs-keyword">this</span>.arg._getBinders(a);
+	}
+	subst(m) {
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Composite(<span class="hljs-keyword">this</span>.fn.subst(m), <span class="hljs-keyword">this</span>.arg.subst(m), <span class="hljs-keyword">this</span>.contravariant);
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-34">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-34">&#182;</a>
+              </div>
+              <p>复合类型的斯科伦化不会向内继续展开</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	skolemise(env) {
+		<span class="hljs-keyword">let</span> {<span class="hljs-attr">map</span>: m1, <span class="hljs-attr">type</span>: t1} = <span class="hljs-keyword">this</span>.arg.skolemise(env);
+		<span class="hljs-keyword">return</span> {
+			<span class="hljs-attr">map</span>: m1,
+			<span class="hljs-attr">type</span>: <span class="hljs-keyword">new</span> Composite(<span class="hljs-keyword">this</span>.fn, t1, <span class="hljs-keyword">this</span>.contravariant)
+		};
+	}
+	zonk(env) {
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Composite(<span class="hljs-keyword">this</span>.fn.zonk(env), <span class="hljs-keyword">this</span>.arg.zonk(env), <span class="hljs-keyword">this</span>.contravariant);
+	}
+	<span class="hljs-comment">/**
+	 * @param{Environment} env
+	 * @param{Type} that
+	 */</span>
+	subsCheckRho(env, that) {
+		<span class="hljs-keyword">const</span> [f2, a2] = unifyComposite(that, env);
+		<span class="hljs-keyword">return</span> subsCheckComposite(env, <span class="hljs-keyword">this</span>.contravariant, <span class="hljs-keyword">this</span>.fn, f2, <span class="hljs-keyword">this</span>.arg, a2);
+	}
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-35">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-35">&#182;</a>
+              </div>
+              <h3 id="-forall-overline-a-rho-">多态类型，$\forall \overline a. \rho$</h3>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">ForAll</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Type</span> </span>{
+	<span class="hljs-comment">/**
+	 * @param {Array&lt;string&gt;} quantifiers
+	 * @param {Type} body
+	 */</span>
+	<span class="hljs-keyword">constructor</span>(quantifiers, body) {
+		<span class="hljs-keyword">super</span>();
+		<span class="hljs-keyword">this</span>.quantifiers = quantifiers;
+		<span class="hljs-keyword">this</span>.body = body;
+	}
+	inspect() {
+		<span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.quantifiers.length) {
+			<span class="hljs-keyword">return</span> <span class="hljs-string">"forall "</span> + <span class="hljs-keyword">this</span>.quantifiers.join(<span class="hljs-string">" "</span>) + <span class="hljs-string">". "</span> + <span class="hljs-keyword">this</span>.body.inspect();
+		} <span class="hljs-keyword">else</span> {
+			<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.body.inspect();
+		}
+	}
+	_getMetaSlots(a) {
+		<span class="hljs-keyword">this</span>.body._getMetaSlots(a);
+	}
+	_getFreeSlots(bound, a) {
+		<span class="hljs-keyword">const</span> b1 = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Set</span>(bound);
+		<span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> q <span class="hljs-keyword">of</span> <span class="hljs-keyword">this</span>.quantifiers) {
+			b1.add(q);
+		}
+		<span class="hljs-keyword">this</span>.body._getFreeSlots(b1, a);
+	}
+	_getBinders(a) {
+		<span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> q <span class="hljs-keyword">of</span> <span class="hljs-keyword">this</span>.quantifiers) {
+			a.add(q);
+		}
+		<span class="hljs-keyword">this</span>.body._getBinders(a);
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-36">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-36">&#182;</a>
+              </div>
+              <p>多态类型进行替换的时候，需要从映射 m 中删掉其量化子 $\overline a$ 包含的项目。</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	subst(m) {
+		<span class="hljs-keyword">let</span> m1 = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Map</span>(m);
+		<span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> q <span class="hljs-keyword">of</span> <span class="hljs-keyword">this</span>.quantifiers) {
+			m1.delete(q);
+		}
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> ForAll(<span class="hljs-keyword">this</span>.quantifiers, <span class="hljs-keyword">this</span>.body.subst(m1));
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-37">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-37">&#182;</a>
+              </div>
+              <p>实例化时，创建一个量化子 $\overline a$ 到「新变量」的映射，然后返回其内容经过替换时的结果。</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	instantiate(env) {
+		<span class="hljs-keyword">let</span> m = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Map</span>();
+		<span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> q <span class="hljs-keyword">of</span> <span class="hljs-keyword">this</span>.quantifiers) {
+			m.set(q, <span class="hljs-keyword">new</span> MetaSlot(env.newMetaSlotVal()));
+		}
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.body.subst(m);
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-38">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-38">&#182;</a>
+              </div>
+              <p>多态类型的深斯科伦化会合并内外两层的变量表。</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-comment">/**
+	 * @param {Environment} env
+	 */</span>
+	skolemise(env) {
+		<span class="hljs-keyword">let</span> m = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Map</span>();
+		<span class="hljs-keyword">let</span> mSub = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Map</span>();
+		<span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> q <span class="hljs-keyword">of</span> <span class="hljs-keyword">this</span>.quantifiers) {
+			<span class="hljs-keyword">const</span> sv = env.newSkolemVariable(q);
+			<span class="hljs-keyword">const</span> ss = <span class="hljs-keyword">new</span> Slot(sv);
+			m.set(sv, ss);
+			mSub.set(q, ss);
+		}
+		<span class="hljs-keyword">let</span> {<span class="hljs-attr">map</span>: m1, <span class="hljs-attr">type</span>: t1} = <span class="hljs-keyword">this</span>.body.subst(mSub).skolemise(env);
+		<span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> [k, v] <span class="hljs-keyword">of</span> m1.entries()) {
+			m.set(k, v);
+		}
+		<span class="hljs-keyword">return</span> {
+			<span class="hljs-attr">map</span>: m,
+			<span class="hljs-attr">type</span>: t1
+		};
+	}
+
+	zonk(env) {
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> ForAll(<span class="hljs-keyword">this</span>.quantifiers, <span class="hljs-keyword">this</span>.body.zonk(env));
+	}
+	<span class="hljs-comment">/**
+	 * @param{Environment} env
+	 * @param{Type} that
+	 */</span>
+	subsCheckRho(env, that) {
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.instantiate(env).subsCheckRho(env, that);
+	}
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-39">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-39">&#182;</a>
+              </div>
+              <h3 id="meta-slot-">Meta Slot，推理过程中的未决议类型</h3>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">MetaSlot</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Type</span> </span>{
+	<span class="hljs-comment">/**
+	 * @param {MetaSlotVal} arg - Argument
+	 */</span>
+	<span class="hljs-keyword">constructor</span>(arg) {
+		<span class="hljs-keyword">super</span>();
+		<span class="hljs-keyword">this</span>.arg = arg;
+	}
+	inspect() {
+		<span class="hljs-keyword">return</span> <span class="hljs-string">"?"</span> + <span class="hljs-keyword">this</span>.arg.id;
+	}
+	_getMetaSlots(a) {
+		<span class="hljs-keyword">if</span> (!a.has(<span class="hljs-keyword">this</span>.arg.id)) {
+			a.set(<span class="hljs-keyword">this</span>.arg.id, <span class="hljs-keyword">this</span>.arg);
+		}
+	}
+	zonk(env) {
+		<span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.arg.typeRef.val) {
+			<span class="hljs-keyword">let</span> t1 = <span class="hljs-keyword">this</span>.arg.typeRef.val.zonk(env);
+			<span class="hljs-keyword">this</span>.arg.typeRef.val = t1;
+			<span class="hljs-keyword">return</span> t1;
+		} <span class="hljs-keyword">else</span> {
+			<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>;
+		}
+	}
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-40">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-40">&#182;</a>
+              </div>
+              <h3 id="metaslotval-metaslot-">MetaSlotVal: MetaSlot 的值</h3>
+<p>MetaSlotVal 包含两个字段，编号 id 和 typeRef，一个对类型的引用。两个 MetaSlotVal 的 id 相同即视为相等。</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">MetaSlotVal</span> </span>{
+	<span class="hljs-comment">/**
+	 * @param {number} id
+	 * @param {{val:Type}} typeRef
+	 */</span>
+	<span class="hljs-keyword">constructor</span>(id, typeRef) {
+		<span class="hljs-keyword">this</span>.id = id;
+		<span class="hljs-keyword">this</span>.typeRef = typeRef;
+	}
+	equalTo(that) {
+		<span class="hljs-keyword">return</span> that &amp;&amp; that <span class="hljs-keyword">instanceof</span> MetaSlotVal &amp;&amp; that.id === <span class="hljs-keyword">this</span>.id;
+	}
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-41">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-41">&#182;</a>
+              </div>
+              <h2 id="-">第三部分，合一</h2>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-comment">/**
+ * @param {Type} t1
+ * @param {Type} t2
+ * @returns {boolean}
+ */</span>
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">unify</span>(<span class="hljs-params">t1, t2</span>) </span>{
+	<span class="hljs-keyword">if</span> (badtype(t1) || badtype(t2)) <span class="hljs-keyword">throw</span> <span class="hljs-string">"Should not be here."</span>
+	<span class="hljs-keyword">if</span> (t1 <span class="hljs-keyword">instanceof</span> Slot &amp;&amp; t2 <span class="hljs-keyword">instanceof</span> Slot &amp;&amp; t1.equalTo(t2)) <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>;
+	<span class="hljs-keyword">if</span> (t1 <span class="hljs-keyword">instanceof</span> MetaSlot &amp;&amp; t2 <span class="hljs-keyword">instanceof</span> MetaSlot &amp;&amp; t1.arg.equalTo(t2.arg)) <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>;
+	<span class="hljs-keyword">if</span> (t1 <span class="hljs-keyword">instanceof</span> MetaSlot) <span class="hljs-keyword">return</span> unifyMetaSlot(t1.arg, t2);
+	<span class="hljs-keyword">if</span> (t2 <span class="hljs-keyword">instanceof</span> MetaSlot) <span class="hljs-keyword">return</span> unifyMetaSlot(t2.arg, t1);
+	<span class="hljs-keyword">if</span> (t1 <span class="hljs-keyword">instanceof</span> Composite &amp;&amp; t2 <span class="hljs-keyword">instanceof</span> Composite) {
+		unify(t1.fn, t2.fn);
+		unify(t2.arg, t2.arg);
+		<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>;
+	}
+	<span class="hljs-keyword">if</span> (t1 <span class="hljs-keyword">instanceof</span> Primitive &amp;&amp; t2 <span class="hljs-keyword">instanceof</span> Primitive &amp;&amp; t1.name === t2.name) { <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>; }
+	<span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-built_in">Error</span>(<span class="hljs-string">`Cannot unify <span class="hljs-subst">${t1.inspect()}</span> with <span class="hljs-subst">${t2.inspect()}</span>`</span>)
+}
+<span class="hljs-comment">/**
+ * @param {Type} t
+ * @returns {boolean}
+ */</span>
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">badtype</span>(<span class="hljs-params">t</span>) </span>{
+	<span class="hljs-keyword">return</span> t <span class="hljs-keyword">instanceof</span> Slot &amp;&amp; !t.isSkolem();
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-42">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-42">&#182;</a>
+              </div>
+              <h3 id="meta-slot-">Meta slot 的合一，一般情况</h3>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-comment">/**
+ * @param {MetaSlotVal} msv
+ * @param {Type} ty
+ */</span>
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">unifyMetaSlot</span>(<span class="hljs-params">msv, ty</span>) </span>{
+	<span class="hljs-keyword">if</span> (msv.typeRef.val) {
+		<span class="hljs-keyword">return</span> unify(msv.typeRef.val, ty);
+	} <span class="hljs-keyword">else</span> {
+		<span class="hljs-keyword">return</span> unifyUnbound(msv, ty);
+	}
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-43">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-43">&#182;</a>
+              </div>
+              <h3 id="meta-slot-">Meta slot 的合一，未绑定情况</h3>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-comment">/**
+ * @param {MetaSlotVal} msv
+ * @param {Type} ty
+ */</span>
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">unifyUnbound</span>(<span class="hljs-params">msv, ty</span>) </span>{
+	<span class="hljs-keyword">if</span> (ty <span class="hljs-keyword">instanceof</span> MetaSlot) {
+		<span class="hljs-keyword">let</span> msv2 = ty.arg;
+		<span class="hljs-keyword">if</span> (msv2.typeRef.val) {
+			<span class="hljs-keyword">return</span> unify(<span class="hljs-keyword">new</span> MetaSlot(msv), msv2.typeRef.val);
+		} <span class="hljs-keyword">else</span> {
+			msv.typeRef.val = ty;
+			<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>;
+		}
+	} <span class="hljs-keyword">else</span> {
+		<span class="hljs-keyword">let</span> msvs2 = ty.getMetaSlots();
+		<span class="hljs-keyword">if</span> (msvs2.has(msv.id)) {
+			<span class="hljs-keyword">throw</span> <span class="hljs-string">"Recursive Type."</span>
+		} <span class="hljs-keyword">else</span> {
+			msv.typeRef.val = ty;
+			<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>;
+		}
+	}
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-44">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-44">&#182;</a>
+              </div>
+              <h3 id="-">合一到函数</h3>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-comment">/**
+ * @param {Type} type
+ * @param {Environment} env
+ * @returns {[Type, Type]}
+ */</span>
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">unifyFun</span>(<span class="hljs-params">type, env</span>) </span>{
+	<span class="hljs-keyword">if</span> (type <span class="hljs-keyword">instanceof</span> Composite &amp;&amp; type.fn <span class="hljs-keyword">instanceof</span> Composite &amp;&amp; type.fn.fn <span class="hljs-keyword">instanceof</span> Primitive &amp;&amp; type.fn.fn.name === <span class="hljs-string">"-&gt;"</span>) {
+		<span class="hljs-keyword">return</span> [type.fn.arg, type.arg];
+	} <span class="hljs-keyword">else</span> {
+		<span class="hljs-keyword">const</span> argMs = <span class="hljs-keyword">new</span> MetaSlot(env.newMetaSlotVal());
+		<span class="hljs-keyword">const</span> resMs = <span class="hljs-keyword">new</span> MetaSlot(env.newMetaSlotVal());
+		unify(FunctionType(argMs, resMs), type);
+		<span class="hljs-keyword">return</span> [argMs, resMs];
+	}
+}
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">FunctionType</span>(<span class="hljs-params">arg, body</span>) </span>{
+	<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Composite(
+		<span class="hljs-keyword">new</span> Composite(<span class="hljs-keyword">new</span> Primitive(<span class="hljs-string">"-&gt;"</span>), arg, <span class="hljs-literal">true</span>),
+		body,
+		<span class="hljs-literal">false</span>
+	);
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-45">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-45">&#182;</a>
+              </div>
+              <h3 id="-">合一到复合类型</h3>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-comment">/**
+ * @param {Type} type
+ * @param {Environment} env
+ * @returns {[Type, Type]}
+ */</span>
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">unifyComposite</span>(<span class="hljs-params">type, env</span>) </span>{
+	<span class="hljs-keyword">if</span> (type <span class="hljs-keyword">instanceof</span> Composite) {
+		<span class="hljs-keyword">return</span> [type.fn, type.arg];
+	} <span class="hljs-keyword">else</span> {
+		<span class="hljs-keyword">const</span> argMs = <span class="hljs-keyword">new</span> MetaSlot(env.newMetaSlotVal());
+		<span class="hljs-keyword">const</span> resMs = <span class="hljs-keyword">new</span> MetaSlot(env.newMetaSlotVal());
+		unify(<span class="hljs-keyword">new</span> Composite(argMs, resMs), type);
+		<span class="hljs-keyword">return</span> [argMs, resMs];
+	}
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-46">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-46">&#182;</a>
+              </div>
+              <h2 id="-">第四部分，主推理算法</h2>
+<p>由于高阶类型的介入，Damas-Hindley-Milner 系统中的单一「推理」方法需要拆分为一对方法，<code>infer</code> 和 <code>check</code>；它们会再根据所处理的类型（$\sigma$ 或者 $\rho$ 类型），再各自进行拆分，因此最终得到四个方法：<code>inferRho</code>, <code>checkRho</code>, <code>inferSigma</code>, <code>checkSigma</code>。</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Term</span> </span>{
+	<span class="hljs-keyword">constructor</span>() {}
+	isAtomic() {
+		<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>;
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-47">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-47">&#182;</a>
+              </div>
+              <h4 id="checkrho-env-rho-type">checkRho：在环境 env 中检查当前表达式是否符合 $\rho$ 类型 type</h4>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-comment">/**
+	 * @param {Environment} env
+	 * @param {Type} type
+	 */</span>
+	_checkRho(env, type) {}
+	checkRho(env, type) {
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>._checkRho(env, type);
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-48">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-48">&#182;</a>
+              </div>
+              <h4 id="inferrho-env-rho-">inferRho：在环境 env 中推理，尝试得到 $\rho$ 类型（或者报错）</h4>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-comment">/**
+	 * @param {Environment} env
+	 * @returns {Type}
+	 */</span>
+	_inferRho(env) {}
+	inferRho(env) {
+		<span class="hljs-keyword">const</span> t = <span class="hljs-keyword">this</span>._inferRho(env);
+		<span class="hljs-keyword">if</span> (!t) <span class="hljs-keyword">throw</span> <span class="hljs-string">"Cannot decide type"</span>
+		<span class="hljs-keyword">return</span> t;
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-49">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-49">&#182;</a>
+              </div>
+              <h4 id="checksigma-env-sigma-type">checkSigma：在环境 env 中检查当前表达式是否符合 $\sigma$ 类型 type</h4>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-comment">/**
+	 * @param{Environment} env
+	 * @param{Type} sigma
+	 */</span>
+	checkSigma(env, type) {
+		<span class="hljs-keyword">const</span> {<span class="hljs-attr">map</span>: mvs, <span class="hljs-attr">type</span>: rho} = type.skolemise(env);
+		<span class="hljs-keyword">this</span>.checkRho(env, rho);
+		<span class="hljs-keyword">const</span> envTys = env.getTypes();
+		<span class="hljs-keyword">const</span> escTvs = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Set</span>(env.getAllFreeSlots(envTys));
+		<span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> [name, slot] <span class="hljs-keyword">of</span> mvs) {
+			<span class="hljs-keyword">if</span> (escTvs.has(rawNameOfSkolemisedName(name))) {
+				<span class="hljs-keyword">throw</span> <span class="hljs-string">"Type is not polymorphic enough"</span>
+			}
+		}
+		<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>;
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-50">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-50">&#182;</a>
+              </div>
+              <h4 id="infersigma-env-sigma-">inferSigma：在环境 env 中推理，尝试得到 $\sigma$ 类型（或者报错）</h4>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-comment">/**
+	 * @param{Environment} env
+	 * @returns{Type}
+	 */</span>
+	inferSigma(env) {
+		<span class="hljs-keyword">const</span> expTy = <span class="hljs-keyword">this</span>.inferRho(env);
+		<span class="hljs-keyword">const</span> envTys = env.getTypes();
+		<span class="hljs-keyword">const</span> envMsvs = env.getMetaSlotVars(envTys);
+		<span class="hljs-keyword">const</span> resMsvs = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Map</span>(env.getMetaSlotVars([expTy]));
+		<span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> [id, v] <span class="hljs-keyword">of</span> envMsvs) {
+			resMsvs.delete(id);
+		}
+		<span class="hljs-keyword">return</span> expTy.quantify(env, <span class="hljs-built_in">Array</span>.from(resMsvs.values()));
+	}
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-51">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-51">&#182;</a>
+              </div>
+              <h3 id="-">直接量</h3>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Lit</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Term</span> </span>{
+	<span class="hljs-comment">/**
+	 * @param {any} n
+	 */</span>
+	<span class="hljs-keyword">constructor</span>(n) {
+		<span class="hljs-keyword">super</span>();
+		<span class="hljs-keyword">this</span>.lit = n;
+	}
+	isAtomic() {
+		<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>;
+	}
+	_checkRho(env, exp) {
+		<span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> <span class="hljs-keyword">this</span>.lit === <span class="hljs-string">"number"</span>) {
+			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Primitive(<span class="hljs-string">"int"</span>).instSigmaCheck(env, exp);
+		} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> <span class="hljs-keyword">this</span>.lit === <span class="hljs-string">"string"</span>) {
+			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Primitive(<span class="hljs-string">"str"</span>).instSigmaCheck(env, exp);
+		} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> <span class="hljs-keyword">this</span>.lit === <span class="hljs-string">"boolean"</span>) {
+			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Primitive(<span class="hljs-string">"boolean"</span>).instSigmaCheck(env, exp);
+		} <span class="hljs-keyword">else</span> {
+			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Primitive(<span class="hljs-string">"unit"</span>).instSigmaCheck(env, exp);
+		}
+	}
+	_inferRho(env) {
+		<span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> <span class="hljs-keyword">this</span>.lit === <span class="hljs-string">"number"</span>) {
+			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Primitive(<span class="hljs-string">"int"</span>).instSigmaInfer(env);
+		} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> <span class="hljs-keyword">this</span>.lit === <span class="hljs-string">"string"</span>) {
+			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Primitive(<span class="hljs-string">"str"</span>).instSigmaInfer(env);
+		} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> <span class="hljs-keyword">this</span>.lit === <span class="hljs-string">"boolean"</span>) {
+			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Primitive(<span class="hljs-string">"boolean"</span>).instSigmaInfer(env);
+		} <span class="hljs-keyword">else</span> {
+			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Primitive(<span class="hljs-string">"unit"</span>).instSigmaInfer(env);
+		}
+	}
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-52">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-52">&#182;</a>
+              </div>
+              <h3 id="-">变量</h3>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Var</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Term</span> </span>{
+	<span class="hljs-comment">/**
+	 * @param {string} name
+	 */</span>
+	<span class="hljs-keyword">constructor</span>(name) {
+		<span class="hljs-keyword">super</span>();
+		<span class="hljs-keyword">this</span>.name = name;
+	}
+	isAtomic() {
+		<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>;
+	}
+	_checkRho(env, expected) {
+		<span class="hljs-keyword">return</span> env.lookup(<span class="hljs-keyword">this</span>.name).instSigmaCheck(env, expected);
+	}
+	_inferRho(env) {
+		<span class="hljs-keyword">return</span> env.lookup(<span class="hljs-keyword">this</span>.name).instSigmaInfer(env);
+	}
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-53">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-53">&#182;</a>
+              </div>
+              <h3 id="-">函数调用</h3>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">App</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Term</span> </span>{
+	<span class="hljs-comment">/**
+	 * @param {Term} fn
+	 * @param {Term} arg
+	 */</span>
+	<span class="hljs-keyword">constructor</span>(fn, arg) {
+		<span class="hljs-keyword">super</span>();
+		<span class="hljs-keyword">this</span>.fn = fn;
+		<span class="hljs-keyword">this</span>.arg = arg;
+	}
+	_checkRho(env, expected) {
+		<span class="hljs-keyword">const</span> funTy = <span class="hljs-keyword">this</span>.fn.inferRho(env);
+		<span class="hljs-keyword">const</span> [argTy, resTy] = unifyFun(funTy, env);
+		<span class="hljs-keyword">this</span>.arg.checkSigma(env, argTy);
+		<span class="hljs-keyword">return</span> resTy.instSigmaCheck(env, expected);
+	}
+	_inferRho(env) {
+		<span class="hljs-keyword">const</span> funTy = <span class="hljs-keyword">this</span>.fn.inferRho(env);
+		<span class="hljs-keyword">const</span> [argTy, resTy] = unifyFun(funTy, env);
+		<span class="hljs-keyword">this</span>.arg.checkSigma(env, argTy);
+		<span class="hljs-keyword">return</span> resTy.instSigmaInfer(env);
+	}
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-54">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-54">&#182;</a>
+              </div>
+              <h3 id="-">函数抽象</h3>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Lam</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Term</span> </span>{
+	<span class="hljs-comment">/**
+	 * @param {string} param
+	 * @param {Term} body
+	 */</span>
+	<span class="hljs-keyword">constructor</span>(param, body) {
+		<span class="hljs-keyword">super</span>();
+		<span class="hljs-keyword">this</span>.param = param;
+		<span class="hljs-keyword">this</span>.body = body;
+	}
+	<span class="hljs-comment">/**
+	 * @param{Environment} env
+	 * @param{Type} expected
+	 */</span>
+	_checkRho(env, expected) {
+		<span class="hljs-keyword">const</span> [varTy, bodyTy] = unifyFun(expected, env);
+		<span class="hljs-keyword">const</span> env1 = env.extend(<span class="hljs-keyword">this</span>.param, varTy);
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.body.checkRho(env1, bodyTy);
+	}
+	<span class="hljs-comment">/**
+	 * @param{Environment} env
+	 * @returns{Type} 
+	 */</span>
+	_inferRho(env) {
+		<span class="hljs-keyword">const</span> varTy = <span class="hljs-keyword">new</span> MetaSlot(env.newMetaSlotVal());
+		<span class="hljs-keyword">const</span> env1 = env.extend(<span class="hljs-keyword">this</span>.param, varTy);
+		<span class="hljs-keyword">const</span> bodyTy = <span class="hljs-keyword">this</span>.body.inferRho(env1);
+		<span class="hljs-keyword">return</span> FunctionType(varTy, bodyTy);
+	}
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-55">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-55">&#182;</a>
+              </div>
+              <h3 id="-">标记了参数类型的函数抽象</h3>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">ALam</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Term</span> </span>{
+	<span class="hljs-comment">/**
+	 * @param {string} param
+	 * @param {Type} type
+	 * @param {Term} body
+	 */</span>
+	<span class="hljs-keyword">constructor</span>(param, type, body) {
+		<span class="hljs-keyword">super</span>();
+		<span class="hljs-keyword">this</span>.param = param;
+		<span class="hljs-keyword">this</span>.type = type;
+		<span class="hljs-keyword">this</span>.body = body;
+	}
+	<span class="hljs-comment">/**
+	 * @param{Environment} env
+	 * @param{Type} expected
+	 */</span>
+	_checkRho(env, expected) {
+		<span class="hljs-keyword">const</span> [varTy, bodyTy] = unifyFun(expected, env);
+		varTy.subsCheck(<span class="hljs-keyword">this</span>.type);
+		<span class="hljs-keyword">const</span> env1 = env.extend(<span class="hljs-keyword">this</span>.param, varTy);
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.body.checkRho(env1, bodyTy);
+	}
+	<span class="hljs-comment">/**
+	 * @param{Environment} env
+	 * @returns{Type} 
+	 */</span>
+	_inferRho(env) {
+		<span class="hljs-keyword">const</span> env1 = env.extend(<span class="hljs-keyword">this</span>.param, <span class="hljs-keyword">this</span>.type);
+		<span class="hljs-keyword">const</span> bodyTy = <span class="hljs-keyword">this</span>.body.inferRho(env1);
+		<span class="hljs-keyword">return</span> FunctionType(<span class="hljs-keyword">this</span>.type, bodyTy);
+	}
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-56">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-56">&#182;</a>
+              </div>
+              <h3 id="-let-">递归 Let 绑定</h3>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Let</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Term</span> </span>{
+	<span class="hljs-comment">/**
+	 * Recursive [let] construction
+	 * @param {Array&lt;{name: string, bind: Term}&gt;} terms
+	 * @param {Term} body
+	 */</span>
+	<span class="hljs-keyword">constructor</span>(terms, body) {
+		<span class="hljs-keyword">super</span>();
+		<span class="hljs-keyword">this</span>.terms = terms;
+		<span class="hljs-keyword">this</span>.body = body;
+	}
+	<span class="hljs-comment">/**
+	 * @param{Environment} env
+	 * @param{Type} expected
+	 */</span>
+	_checkRho(env, expected) {
+		<span class="hljs-keyword">const</span> env1TypeBindings = <span class="hljs-keyword">this</span>.terms.map(<span class="hljs-function">(<span class="hljs-params">{name}</span>) =&gt;</span> ({name, <span class="hljs-attr">type</span>: <span class="hljs-keyword">new</span> MetaSlot(env.newMetaSlotVal())}));
+		<span class="hljs-keyword">const</span> env1 = env.extendN(env1TypeBindings);
+		<span class="hljs-keyword">const</span> varTys = <span class="hljs-keyword">this</span>.terms.map(<span class="hljs-function">(<span class="hljs-params">{name, bind}</span>) =&gt;</span> ({name, <span class="hljs-attr">type</span>: bind.inferSigma(env1)}));
+		<span class="hljs-keyword">const</span> env2 = env.extendN(varTys);
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.body.checkRho(env2, expected);
+	}
+	<span class="hljs-comment">/**
+	 * @param{Environment} env
+	 * @returns{Type} 
+	 */</span>
+	_inferRho(env) {
+		<span class="hljs-keyword">const</span> env1TypeBindings = <span class="hljs-keyword">this</span>.terms.map(<span class="hljs-function">(<span class="hljs-params">{name}</span>) =&gt;</span> ({name, <span class="hljs-attr">type</span>: <span class="hljs-keyword">new</span> MetaSlot(env.newMetaSlotVal())}));
+		<span class="hljs-keyword">const</span> env1 = env.extendN(env1TypeBindings);
+		<span class="hljs-keyword">const</span> varTys = <span class="hljs-keyword">this</span>.terms.map(<span class="hljs-function">(<span class="hljs-params">{name, bind}</span>) =&gt;</span> ({name, <span class="hljs-attr">type</span>: bind.inferSigma(env1)}));
+		<span class="hljs-keyword">const</span> env2 = env.extendN(varTys);
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.body.inferRho(env2);
+	}
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-57">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-57">&#182;</a>
+              </div>
+              <h3 id="-">显式窄化</h3>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Ann</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Term</span> </span>{
+	<span class="hljs-comment">/**
+	 * @param {Type} type
+	 * @param {Term} body
+	 */</span>
+	<span class="hljs-keyword">constructor</span>(body, type) {
+		<span class="hljs-keyword">super</span>();
+		<span class="hljs-keyword">this</span>.type = type;
+		<span class="hljs-keyword">this</span>.body = body;
+	}
+	<span class="hljs-comment">/**
+	 * @param{Environment} env
+	 * @param{Type} expected
+	 */</span>
+	_checkRho(env, expected) {
+		<span class="hljs-keyword">this</span>.body.checkSigma(env, <span class="hljs-keyword">this</span>.type);
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.type.instSigmaCheck(env, expected);
+	}
+	<span class="hljs-comment">/**
+	 * @param{Environment} env
+	 * @returns{Type} 
+	 */</span>
+	_inferRho(env) {
+		<span class="hljs-keyword">this</span>.body.checkSigma(env, <span class="hljs-keyword">this</span>.type);
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.type.instSigmaInfer(env);
+	}
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-58">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-58">&#182;</a>
+              </div>
+              <h2 id="-">测试部分</h2>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-comment">/**
+ * @returns{Type}
+ */</span>
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">translateType</span>(<span class="hljs-params">a</span>) </span>{
+	<span class="hljs-keyword">if</span> (a <span class="hljs-keyword">instanceof</span> <span class="hljs-built_in">Array</span>) {
+		<span class="hljs-keyword">if</span> (a[<span class="hljs-number">0</span>] === <span class="hljs-string">"forall"</span>) {
+			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> ForAll(
+				a[<span class="hljs-number">1</span>].map(<span class="hljs-function"><span class="hljs-params">x</span> =&gt;</span> translateType(x).name),
+				translateType(a[<span class="hljs-number">2</span>])
+			);
+		} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (a.length === <span class="hljs-number">2</span>) {
+			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Composite(translateType(a[<span class="hljs-number">0</span>]), translateType(a[<span class="hljs-number">1</span>]), a[<span class="hljs-number">0</span>] === <span class="hljs-string">"-&gt;"</span> ? <span class="hljs-literal">true</span> : <span class="hljs-literal">false</span>);
+		} <span class="hljs-keyword">else</span> {
+			<span class="hljs-keyword">const</span> fnpart = translateType(a.slice(<span class="hljs-number">0</span>, <span class="hljs-number">-1</span>));
+			<span class="hljs-keyword">const</span> argpart = translateType(a[a.length - <span class="hljs-number">1</span>]);
+			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Composite(fnpart, argpart, <span class="hljs-literal">false</span>);
+		}
+	} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (a[<span class="hljs-number">0</span>] === <span class="hljs-string">"'"</span>) {
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Slot(a.slice(<span class="hljs-number">1</span>));
+	} <span class="hljs-keyword">else</span> {
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Primitive(a);
+	}
+}
+
+<span class="hljs-comment">/**
+ * @returns{Term}
+ */</span>
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">translate</span>(<span class="hljs-params">a</span>) </span>{
+	<span class="hljs-keyword">if</span> (!a) {
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Lit(a);
+	} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (a <span class="hljs-keyword">instanceof</span> <span class="hljs-built_in">Array</span>) {
+		<span class="hljs-keyword">if</span> (a[<span class="hljs-number">0</span>] === <span class="hljs-string">"let"</span>) {
+			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Let(
+				a.slice(<span class="hljs-number">1</span>, <span class="hljs-number">-1</span>).map(<span class="hljs-function"><span class="hljs-params">form</span> =&gt;</span> ({<span class="hljs-attr">name</span>: form[<span class="hljs-number">0</span>], <span class="hljs-attr">bind</span>: translate(form[<span class="hljs-number">1</span>])})),
+				translate(a[a.length - <span class="hljs-number">1</span>]));
+		} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (a[<span class="hljs-number">0</span>] === <span class="hljs-string">"lambda"</span> &amp;&amp; a.length &gt;= <span class="hljs-number">3</span>) {
+			<span class="hljs-keyword">const</span> fn0 = translate(a[a.length - <span class="hljs-number">1</span>]);
+			<span class="hljs-keyword">return</span> a.slice(<span class="hljs-number">1</span>, <span class="hljs-number">-1</span>).reduceRight(<span class="hljs-function">(<span class="hljs-params">fn, term</span>) =&gt;</span> (<span class="hljs-keyword">typeof</span> term === <span class="hljs-string">"string"</span>)
+				? <span class="hljs-keyword">new</span> Lam(term, fn)
+				: <span class="hljs-keyword">new</span> ALam(term[<span class="hljs-number">0</span>], translateType(term[<span class="hljs-number">1</span>]), fn), fn0);
+		} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (a[<span class="hljs-number">0</span>] === <span class="hljs-string">"begin"</span>) {
+			<span class="hljs-keyword">return</span> translate(a.slice(<span class="hljs-number">1</span>).reduceRight(<span class="hljs-function">(<span class="hljs-params">y, x</span>) =&gt;</span> [<span class="hljs-string">"seq"</span>, x, y]));
+		} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (a[<span class="hljs-number">0</span>] === <span class="hljs-string">"::"</span>) {
+			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Ann(translate(a[<span class="hljs-number">1</span>]), translateType(a[<span class="hljs-number">2</span>]));
+		} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (a.length === <span class="hljs-number">2</span>) {
+			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> App(translate(a[<span class="hljs-number">0</span>]), translate(a[<span class="hljs-number">1</span>]));
+		} <span class="hljs-keyword">else</span> {
+			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> App(translate(a.slice(<span class="hljs-number">0</span>, a.length - <span class="hljs-number">1</span>)), translate(a[a.length - <span class="hljs-number">1</span>]));
+		}
+	} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> a === <span class="hljs-string">"string"</span>) {
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Var(a);
+	} <span class="hljs-keyword">else</span> {
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Lit(a);
+	}
+}
+
+<span class="hljs-keyword">const</span> env = <span class="hljs-keyword">new</span> Environment({ <span class="hljs-attr">val</span>: <span class="hljs-number">0</span> }, <span class="hljs-keyword">new</span> <span class="hljs-built_in">Map</span>([
+	[<span class="hljs-string">"&amp;"</span>, translateType([<span class="hljs-string">"forall"</span>, [<span class="hljs-string">"'a"</span>, <span class="hljs-string">"'b"</span>],
+		[<span class="hljs-string">"-&gt;"</span>, <span class="hljs-string">"'a"</span>,
+			[<span class="hljs-string">"-&gt;"</span>, <span class="hljs-string">"'b"</span>,
+				[<span class="hljs-string">"*"</span>, <span class="hljs-string">"'a"</span>, <span class="hljs-string">"'b"</span>]]]])],
+	[<span class="hljs-string">"+"</span>, translateType([<span class="hljs-string">"-&gt;"</span>, <span class="hljs-string">"int"</span>, [<span class="hljs-string">"-&gt;"</span>, <span class="hljs-string">"int"</span>, <span class="hljs-string">"int"</span>]])],
+	[<span class="hljs-string">"-"</span>, translateType([<span class="hljs-string">"-&gt;"</span>, <span class="hljs-string">"int"</span>, [<span class="hljs-string">"-&gt;"</span>, <span class="hljs-string">"int"</span>, <span class="hljs-string">"int"</span>]])],
+	[<span class="hljs-string">"empty?"</span>, translateType([<span class="hljs-string">"forall"</span>, [<span class="hljs-string">"'a"</span>], [<span class="hljs-string">"-&gt;"</span>, [<span class="hljs-string">"list"</span>, <span class="hljs-string">'"a'</span>], <span class="hljs-string">"bool"</span>]])],
+	[<span class="hljs-string">"zero?"</span>, translateType([<span class="hljs-string">"-&gt;"</span>, <span class="hljs-string">"int"</span>, <span class="hljs-string">"bool"</span>])],
+	[<span class="hljs-string">"cdr"</span>, translateType([<span class="hljs-string">"forall"</span>, [<span class="hljs-string">"'a"</span>], [<span class="hljs-string">"-&gt;"</span>, [<span class="hljs-string">"list"</span>, <span class="hljs-string">'"a'</span>], [<span class="hljs-string">"list"</span>, <span class="hljs-string">"'a"</span>]]])],
+	[<span class="hljs-string">"if"</span>, translateType([<span class="hljs-string">"forall"</span>, [<span class="hljs-string">"'a"</span>], [<span class="hljs-string">"-&gt;"</span>,
+		<span class="hljs-string">"bool"</span>,
+		[<span class="hljs-string">"-&gt;"</span>, <span class="hljs-string">"'a"</span>, [<span class="hljs-string">"-&gt;"</span>, <span class="hljs-string">"'a"</span>, <span class="hljs-string">"'a"</span>]]]])],
+	[<span class="hljs-string">"somelist"</span>, translateType([<span class="hljs-string">"list"</span>, <span class="hljs-string">"int"</span>])],
+	[<span class="hljs-string">"box"</span>, translateType([<span class="hljs-string">"forall"</span>, [<span class="hljs-string">"'t"</span>], [<span class="hljs-string">"-&gt;"</span>, <span class="hljs-string">"'t"</span>, [<span class="hljs-string">"forall"</span>, [<span class="hljs-string">"'a"</span>], [<span class="hljs-string">"box"</span>, <span class="hljs-string">"'a"</span>]]]])],
+	[<span class="hljs-string">"unbox"</span>, translateType([<span class="hljs-string">"forall"</span>, [<span class="hljs-string">"'t"</span>], [<span class="hljs-string">"-&gt;"</span>, [<span class="hljs-string">"forall"</span>, [<span class="hljs-string">"'a"</span>], [<span class="hljs-string">"box"</span>, <span class="hljs-string">"'a"</span>]], <span class="hljs-string">"'t"</span>]])]
+]));
+
+<span class="hljs-keyword">const</span> a = translate(
+	[<span class="hljs-string">"let"</span>,
+		[<span class="hljs-string">"even?"</span>, [<span class="hljs-string">"lambda"</span>, [<span class="hljs-string">"x"</span>, <span class="hljs-string">"int"</span>],
+			[<span class="hljs-string">"if"</span>, [<span class="hljs-string">"zero?"</span>, <span class="hljs-string">"x"</span>],
+				<span class="hljs-literal">true</span>,
+				[<span class="hljs-string">"odd?"</span>, [<span class="hljs-string">"-"</span>, <span class="hljs-string">"x"</span>, <span class="hljs-number">1</span>]]]]],
+		[<span class="hljs-string">"odd?"</span>, [<span class="hljs-string">"lambda"</span>, [<span class="hljs-string">"x"</span>, <span class="hljs-string">"int"</span>],
+			[<span class="hljs-string">"if"</span>, [<span class="hljs-string">"zero?"</span>, <span class="hljs-string">"x"</span>],
+				<span class="hljs-literal">false</span>,
+				[<span class="hljs-string">"even?"</span>, [<span class="hljs-string">"-"</span>, <span class="hljs-string">"x"</span>, <span class="hljs-number">1</span>]]]]],
+		[<span class="hljs-string">"id"</span>, [<span class="hljs-string">"lambda"</span>, <span class="hljs-string">"x"</span>, <span class="hljs-string">"x"</span>]],
+		[<span class="hljs-string">"id_dyn"</span>, [<span class="hljs-string">"lambda"</span>, [<span class="hljs-string">"x"</span>, [<span class="hljs-string">"forall"</span>, [<span class="hljs-string">"'a"</span>], [<span class="hljs-string">"box"</span>, <span class="hljs-string">"'a"</span>]]], [<span class="hljs-string">"::"</span>, [<span class="hljs-string">"unbox"</span>, <span class="hljs-string">"x"</span>], <span class="hljs-string">"int"</span>]]],
+		[<span class="hljs-string">"let"</span>,
+			[<span class="hljs-string">"strange"</span>,
+				[<span class="hljs-string">"lambda"</span>,
+					[<span class="hljs-string">"f"</span>, [<span class="hljs-string">"forall"</span>, [<span class="hljs-string">"'a"</span>], [<span class="hljs-string">"-&gt;"</span>, <span class="hljs-string">"'a"</span>, <span class="hljs-string">"'a"</span>]]],
+					[<span class="hljs-string">"&amp;"</span>, [<span class="hljs-string">"f"</span>, <span class="hljs-number">1</span>], [<span class="hljs-string">"f"</span>, [<span class="hljs-string">"even?"</span>, <span class="hljs-number">5</span>]]]]],
+			[<span class="hljs-string">"&amp;"</span>, [<span class="hljs-string">"strange"</span>, <span class="hljs-string">"id"</span>], [<span class="hljs-string">"id_dyn"</span>, [<span class="hljs-string">"box"</span>, <span class="hljs-number">1</span>]]]]]
+);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-59">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-59">&#182;</a>
+              </div>
+              <p>应当返回：<code>(int * boolean) * int</code></p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-built_in">console</span>.log(util.inspect(a.inferSigma(env).zonk(env), { <span class="hljs-attr">depth</span>: <span class="hljs-literal">null</span> }));</pre></div></div>
+            
+        </li>
+        
+    </ul>
+  </div>
+</body>
+</html>
