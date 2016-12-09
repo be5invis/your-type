@@ -71,7 +71,7 @@ class Type {
 	 */
 	quantify(env, mvs) {
 		let usedBinders = this.getBinders();
-		let nRef = {val: 0};
+		let nRef = { val: 0 };
 		let newBinders = [];
 		for (let slot of mvs) {
 			let newBinder = new Slot(generateBinder(nRef, usedBinders));
@@ -103,7 +103,7 @@ class Type {
 	 * @param{Type} that
 	 */
 	subsCheck(env, that) {
-		const {map:skolTvs, type:rho2} = this.skolemise(env);
+		const {map: skolTvs, type: rho2} = this.skolemise(env);
 		this.subsCheckRho(env, rho2);
 		const escTvs = new Set(env.getAllFreeSlots([this, that]));
 		for (let [k, v] of skolTvs) {
@@ -134,7 +134,7 @@ function subsCheckComposite(env, f1, f2, a1, a2) {
 function generateBinder(nRef, used) {
 	nRef.val += 1;
 	let name = "t" + nRef.val;
-	while(used.has(name)){
+	while (used.has(name)) {
 		nRef.val += 1;
 		name = "t" + nRef.val;
 	}
@@ -263,7 +263,7 @@ class Composite extends Type {
 		return new Composite(this.fn.subst(m), this.arg.subst(m));
 	}
 	skolemise(env) {
-		let {map:m1, type:t1} = this.arg.skolemise(env);
+		let {map: m1, type: t1} = this.arg.skolemise(env);
 		return {
 			map: m1,
 			type: new Composite(this.fn, t1)
@@ -356,7 +356,7 @@ class Environment {
 	}
 	newMetaSlotVal() {
 		const u = this.newUnique();
-		const ref = {val: null};
+		const ref = { val: null };
 		return new MetaSlotVal(u, ref);
 	}
 	newSkolemVariable(s) {
@@ -373,7 +373,7 @@ class Environment {
 	* getMetaSlotVars(tys) {
 		for (let type of tys) {
 			let type1 = type.zonk(this);
-			yield * type1.getMetaSlots();
+			yield* type1.getMetaSlots();
 		}
 	}
 	/**
@@ -382,7 +382,7 @@ class Environment {
 	* getAllFreeSlots(tys) {
 		for (let type of tys) {
 			let type1 = type.zonk(this);
-			yield * type1.getFreeSlots();
+			yield* type1.getFreeSlots();
 		}
 	}
 }
@@ -404,7 +404,7 @@ function unify(t1, t2) {
 		unify(t2.arg, t2.arg);
 		return true;
 	}
-	if (t1 instanceof Primitive && t2 instanceof Primitive && t1.name === t2.name) {return true;}
+	if (t1 instanceof Primitive && t2 instanceof Primitive && t1.name === t2.name) { return true; }
 	throw "Cannot unify."
 }
 /**
@@ -459,10 +459,10 @@ function unifyFun(type, env) {
 	if (type instanceof Composite && type.fn instanceof Composite && type.fn.fn instanceof Primitive && type.fn.fn.name === "->") {
 		return [type.fn.arg, type.arg];
 	} else {
-		const argMsv = env.newMetaSlotVal();
-		const resMsv = env.newMetaSlotVal();
-		unify(type, FunctionType(new MetaSlot(argMsv), new MetaSlot(resMsv)));
-		return [argMsv, resMsv];
+		const argMs = new MetaSlot(env.newMetaSlotVal());
+		const resMs = new MetaSlot(env.newMetaSlotVal());
+		unify(FunctionType(argMs, resMs), type);
+		return [argMs, resMs];
 	}
 }
 /**
@@ -474,10 +474,10 @@ function unifyComposite(type, env) {
 	if (type instanceof Composite) {
 		return [type.fn, type.arg];
 	} else {
-		const argMsv = env.newMetaSlotVal();
-		const resMsv = env.newMetaSlotVal();
-		unify(type, new Composite(new MetaSlot(argMsv), new MetaSlot(resMsv)));
-		return [argMsv, resMsv];
+		const argMs = new MetaSlot(env.newMetaSlotVal());
+		const resMs = new MetaSlot(env.newMetaSlotVal());
+		unify(new Composite(argMs, resMs), type);
+		return [argMs, resMs];
 	}
 }
 /**
@@ -499,18 +499,18 @@ class Term {
 		return false;
 	}
 	/**
-* 	 * @param {Environment} env
+	 * @param {Environment} env
 	 */
 	checkRho(env, type) {
-		return this.tcRho(env, {check: type});
+		return this.tcRho(env, { check: type });
 	}
 	/**
 	 * @param {Environment} env
 	 * @returns {Type}
 	 */
 	inferRho(env) {
-		const ref = {val: null};
-		this.tcRho(env, {infer: ref});
+		const ref = { val: null };
+		this.tcRho(env, { infer: ref });
 		if (!ref.val) throw "Cannot decide type"
 		return ref.val;
 	}
@@ -620,10 +620,12 @@ class Lam extends Term {
 	 */
 	tcRho(env, exp) {
 		if (exp.check) {
+			// check step
 			const [varTy, bodyTy] = unifyFun(exp.check, env);
 			const env1 = env.extend(this.param, varTy);
 			return this.body.checkRho(env1, bodyTy);
 		} else {
+			// Inference step
 			const varTy = new MetaSlot(env.newMetaSlotVal());
 			const env1 = env.extend(this.param, varTy);
 			const bodyTy = this.body.inferRho(env1);
@@ -678,9 +680,10 @@ class Let extends Term {
 	 * @param{Environment} env
 	 */
 	tcRho(env, exp) {
-		const varTy = this.bind.inferSigma(env);
-		const env1 = env.extend(this.name, varTy);
-		return this.body.tcRho(env1, exp);
+		const env1 = env.extend(this.name, new MetaSlot(env.newMetaSlotVal()));
+		const varTy = this.bind.inferSigma(env1);
+		const env2 = env.extend(this.name, varTy);
+		return this.body.tcRho(env2, exp);
 	}
 }
 class Ann extends Term {
@@ -752,20 +755,27 @@ function translate(a) {
 	}
 }
 
-const env = new Environment({val: 0}, new Map([[
-	"&", translateType(["forall", ["'a", "'b"],
+const env = new Environment({ val: 0 }, new Map([
+	["&", translateType(["forall", ["'a", "'b"],
 		["->", "'a",
 			["->", "'b",
-				["*", "'a", "'b"]]]])
-]]));
+				["*", "'a", "'b"]]]])],
+	["+", translateType(["->", "int", ["->", "int", "int"]])],
+	["empty?", translateType(["forall", ["'a"], ["->", ["list", '"a'], "bool"]])],
+	["cdr", translateType(["forall", ["'a"], ["->", ["list", '"a'], ["list", "'a"]]])],
+	["if", translateType(["forall", ["'a"], ["->",
+		"bool",
+		["->", "'a", ["->", "'a", "'a"]]]])],
+	["somelist", translateType(["list", "int"])],
+]));
 
 const a = translate(
-	["let", "id", ["lambda", "x", "x"],
-		["let", "f",
-			["lambda", 
-				["x", ["forall", ["'a"], ["->", "'a", "'a"]]],
-				["&", ["x", 1], ["x", null]]],
-			["f", "id"]]]
+	["let",
+		"length", ["lambda", "list",
+			["if", ["empty?", "list"],
+				0,
+				["+", 1, ["length", ["cdr", "list"]]]]],
+		["length", "somelist"]]
 );
 
-console.log(util.inspect(a.inferSigma(env), {depth: null}));
+console.log(util.inspect(a.inferSigma(env), { depth: null }));
