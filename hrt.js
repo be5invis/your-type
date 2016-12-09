@@ -75,7 +75,7 @@ class Type {
 			slot.typeRef.val = newBinder;
 			newBinders.push(newBinder);
 		}
-		return new ForAll(newBinders, this.zonk(env));
+		return new ForAll(newBinders.map(x => x.name), this.zonk(env));
 	}
 	/**
 	 * Eliminate any substitutions in the type
@@ -90,7 +90,7 @@ class Type {
 	 */
 	instSigma(env, exp) {
 		if (exp.check) {
-			return subsCheckRho(this, env, exp.check);
+			return this.subsCheckRho(env, exp.check);
 		} else {
 			exp.infer.val = this.instantiate(env);
 		}
@@ -288,9 +288,9 @@ class MetaSlot extends Type {
 		}
 	}
 	zonk(env) {
-		if (this.typeRef.val) {
-			let t1 = this.typeRef.val.zonk(env);
-			this.typeRef.val = t1;
+		if (this.arg.typeRef.val) {
+			let t1 = this.arg.typeRef.val.zonk(env);
+			this.arg.typeRef.val = t1;
 			return t1;
 		} else {
 			return this;
@@ -330,7 +330,7 @@ class Environment {
 	extend(name, type) {
 		let v1 = new Map(this.variables);
 		v1.set(name, type);
-		return new Environment(this.uniqs, this.variables);
+		return new Environment(this.uniqs, v1);
 	}
 	/**
 	 * @param {string} name
@@ -340,7 +340,7 @@ class Environment {
 		if (this.variables.has(name)) {
 			return this.variables.get(name);
 		} else {
-			throw `Variable ${name} not found.`
+			throw new Error(`Variable ${name} not found.`);
 		}
 	}
 	newUnique() {
@@ -508,7 +508,7 @@ class Term {
 		for (let [id, v] of envMsvs) {
 			resMsvs.delete(id);
 		}
-		return expTy.quantify(env, Array.from(resMsvs));
+		return expTy.quantify(env, Array.from(resMsvs.values()));
 	}
 	/**
 	 * @param{Environment} env
@@ -554,7 +554,7 @@ class Var extends Term {
 	}
 	tcRho(env, exp) {
 		const ty = env.lookup(this.name);
-		return ty.instSigma(exp);
+		return ty.instSigma(env, exp);
 	}
 }
 class App extends Term {
@@ -570,7 +570,7 @@ class App extends Term {
 	tcRho(env, exp) {
 		const funTy = this.fn.inferRho(env);
 		const [argTy, resTy] = unifyFun(funTy, env);
-		this.arg.checkRho(argTy);
+		this.arg.checkRho(env, argTy);
 		return resTy.instSigma(env, exp);
 	}
 }
@@ -594,7 +594,7 @@ class Lam extends Term {
 			return this.body.checkRho(env1, bodyTy);
 		} else {
 			const varTy = new MetaSlot(env.newMetaSlotVal());
-			const env1 = env.extend(this.name, varTy);
+			const env1 = env.extend(this.param, varTy);
 			const bodyTy = this.body.inferRho(env1);
 			exp.infer.val = FunctionType(varTy, bodyTy);
 		}
@@ -667,3 +667,8 @@ class Ann extends Term {
 		this.type.instSigma(env, exp);
 	}
 }
+
+const a = new Let("f", new Lam("x", new Var("x")), new App(new Var("f"), new Lit("1")));
+const env = new Environment({val: 0}, new Map());
+
+console.log(a.inferSigma(env));
