@@ -1845,13 +1845,12 @@
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-71">&#182;</a>
               </div>
-              <h3 id="-let-">递归 Let 绑定</h3>
+              <h3 id="-let-">非递归 Let 绑定</h3>
 
             </div>
             
             <div class="content"><div class='highlight'><pre><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Let</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Term</span> </span>{
 	<span class="hljs-comment">/**
-	 * Recursive [let] construction
 	 * @param {Array&lt;{name: string, bind: Term}&gt;} terms
 	 * @param {Term} body
 	 */</span>
@@ -1870,7 +1869,7 @@
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-72">&#182;</a>
               </div>
-              <p>CHECK-LETREC: $\dfrac{\Gamma, x:\mathrm{fresh}\vdash^* t: \sigma’\quad \Gamma, x:\sigma’\vdash u:\rho}{\Gamma\vdash(\mathbf{let\ rec}\ (x=t).u):\rho}$</p>
+              <p>CHECK-LETREC: $\dfrac{\Gamma\vdash^* t: \sigma’\quad \Gamma, x:\sigma’\vdash u:\rho}{\Gamma\vdash(\mathbf{let}\ (x=t).u):\rho}$</p>
 
             </div>
             
@@ -1879,11 +1878,9 @@
 	 * @param{Type} expected
 	 */</span>
 	_checkRho(env, expected) {
-		<span class="hljs-keyword">const</span> env1TypeBindings = <span class="hljs-keyword">this</span>.terms.map(<span class="hljs-function">(<span class="hljs-params">{name}</span>) =&gt;</span> ({name, <span class="hljs-attr">type</span>: <span class="hljs-keyword">new</span> MetaSlot(env.newMetaSlotVal())}));
-		<span class="hljs-keyword">const</span> env1 = env.extendN(env1TypeBindings);
-		<span class="hljs-keyword">const</span> varTys = <span class="hljs-keyword">this</span>.terms.map(<span class="hljs-function">(<span class="hljs-params">{name, bind}</span>) =&gt;</span> ({name, <span class="hljs-attr">type</span>: bind.inferSigma(env1)}));
-		<span class="hljs-keyword">const</span> env2 = env.extendN(varTys);
-		<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.body.checkRho(env2, expected);
+		<span class="hljs-keyword">const</span> varTys = <span class="hljs-keyword">this</span>.terms.map(<span class="hljs-function">(<span class="hljs-params">{name, bind}</span>) =&gt;</span> ({name, <span class="hljs-attr">type</span>: bind.inferSigma(env)}));
+		<span class="hljs-keyword">const</span> env1 = env.extendN(varTys);
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.body.checkRho(env1, expected);
 	}</pre></div></div>
             
         </li>
@@ -1895,7 +1892,7 @@
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-73">&#182;</a>
               </div>
-              <p>INFER-LETREC: $\dfrac{\Gamma, x:\mathrm{fresh}\vdash^* t:\sim \sigma’\quad \Gamma, x:\sigma’\vdash u:\sim\rho}{\Gamma\vdash(\mathbf{let\ rec}\ (x=t).u):\sim\rho}$</p>
+              <p>INFER-LETREC: $\dfrac{\Gamma\vdash^* t:\sim \sigma’\quad \Gamma, x:\sigma’\vdash u:\sim\rho}{\Gamma\vdash(\mathbf{let}\ (x=t).u):\sim\rho}$</p>
 
             </div>
             
@@ -1904,11 +1901,9 @@
 	 * @returns{Type} 
 	 */</span>
 	_inferRho(env) {
-		<span class="hljs-keyword">const</span> env1TypeBindings = <span class="hljs-keyword">this</span>.terms.map(<span class="hljs-function">(<span class="hljs-params">{name}</span>) =&gt;</span> ({name, <span class="hljs-attr">type</span>: <span class="hljs-keyword">new</span> MetaSlot(env.newMetaSlotVal())}));
-		<span class="hljs-keyword">const</span> env1 = env.extendN(env1TypeBindings);
-		<span class="hljs-keyword">const</span> varTys = <span class="hljs-keyword">this</span>.terms.map(<span class="hljs-function">(<span class="hljs-params">{name, bind}</span>) =&gt;</span> ({name, <span class="hljs-attr">type</span>: bind.inferSigma(env1)}));
-		<span class="hljs-keyword">const</span> env2 = env.extendN(varTys);
-		<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.body.inferRho(env2);
+		<span class="hljs-keyword">const</span> varTys = <span class="hljs-keyword">this</span>.terms.map(<span class="hljs-function">(<span class="hljs-params">{name, bind}</span>) =&gt;</span> ({name, <span class="hljs-attr">type</span>: bind.inferSigma(env)}));
+		<span class="hljs-keyword">const</span> env1 = env.extendN(varTys);
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.body.inferRho(env1);
 	}
 }</pre></div></div>
             
@@ -1920,6 +1915,95 @@
               
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-74">&#182;</a>
+              </div>
+              <h3 id="-let-">递归 Let 绑定</h3>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">LetRec</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Term</span> </span>{
+	<span class="hljs-comment">/**
+	 * @param {Array&lt;{name: string, bind: Term, type: Type?}&gt;} terms
+	 * @param {Term} body
+	 */</span>
+	<span class="hljs-keyword">constructor</span>(terms, body) {
+		<span class="hljs-keyword">super</span>();
+		<span class="hljs-keyword">this</span>.terms = terms;
+		<span class="hljs-keyword">this</span>.body = body;
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-75">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-75">&#182;</a>
+              </div>
+              <p>CHECK-LETREC1: $\dfrac{\Gamma, x:\mathrm{fresh}\vdash^* t: \sigma’\quad \Gamma, x:\sigma’\vdash u:\rho}{\Gamma\vdash(\mathbf{let\ rec}\ (x=t).u):\rho}$</p>
+<p>CHECK-LETREC2: $\dfrac{\Gamma, x:\sigma\vdash^* t: \sigma’\quad \Gamma, x:\sigma’\vdash u:\rho}{\Gamma\vdash(\mathbf{let\ rec}\ (x:\sigma=t).u):\rho}$</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-comment">/**
+	 * @param{Environment} env
+	 * @param{Type} expected
+	 */</span>
+	_checkRho(env, expected) {
+		<span class="hljs-keyword">const</span> env1TypeBindings = <span class="hljs-keyword">this</span>.terms.map(<span class="hljs-function">(<span class="hljs-params">{name, type}</span>) =&gt;</span> ({
+			name,
+			<span class="hljs-attr">type</span>: type || <span class="hljs-keyword">new</span> MetaSlot(env.newMetaSlotVal())
+		}));
+		<span class="hljs-keyword">const</span> env1 = env.extendN(env1TypeBindings);
+		<span class="hljs-keyword">const</span> varTys = <span class="hljs-keyword">this</span>.terms.map(<span class="hljs-function">(<span class="hljs-params">{name, bind}</span>) =&gt;</span> ({name, <span class="hljs-attr">type</span>: bind.inferSigma(env1)}));
+		<span class="hljs-keyword">const</span> env2 = env.extendN(varTys);
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.body.checkRho(env2, expected);
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-76">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-76">&#182;</a>
+              </div>
+              <p>INFER-LETREC1: $\dfrac{\Gamma, x:\mathrm{fresh}\vdash^* t:\sim \sigma’\quad \Gamma, x:\sigma’\vdash u:\sim\rho}{\Gamma\vdash(\mathbf{let\ rec}\ (x=t).u):\sim\rho}$</p>
+<p>INFER-LETREC2: $\dfrac{\Gamma, x:\sigma\vdash^* t:\sim \sigma’\quad \Gamma, x:\sigma’\vdash u:\sim\rho}{\Gamma\vdash(\mathbf{let\ rec}\ (x:\sigma=t).u):\sim\rho}$</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-comment">/**
+	 * @param{Environment} env
+	 * @returns{Type} 
+	 */</span>
+	_inferRho(env) {
+		<span class="hljs-keyword">const</span> env1TypeBindings = <span class="hljs-keyword">this</span>.terms.map(<span class="hljs-function">(<span class="hljs-params">{name, type}</span>) =&gt;</span> ({
+			name,
+			<span class="hljs-attr">type</span>: type || <span class="hljs-keyword">new</span> MetaSlot(env.newMetaSlotVal())
+		}));
+		<span class="hljs-keyword">const</span> env1 = env.extendN(env1TypeBindings);
+		<span class="hljs-keyword">const</span> varTys = <span class="hljs-keyword">this</span>.terms.map(<span class="hljs-function">(<span class="hljs-params">{name, bind, type}</span>) =&gt;</span> {
+			<span class="hljs-keyword">const</span> inferredType = bind.inferSigma(env1);
+			<span class="hljs-keyword">if</span> (type) {
+				type.subsCheck(env, inferredType);
+			}
+			<span class="hljs-keyword">return</span> {name, <span class="hljs-attr">type</span>: inferredType};
+		});
+		<span class="hljs-keyword">const</span> env2 = env.extendN(varTys);
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.body.inferRho(env2);
+	}
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-77">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-77">&#182;</a>
               </div>
               <h3 id="-">显式窄化</h3>
 
@@ -1939,11 +2023,11 @@
         </li>
         
         
-        <li id="section-75">
+        <li id="section-78">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-75">&#182;</a>
+                <a class="pilcrow" href="#section-78">&#182;</a>
               </div>
               <p>CHECK-ANN: $\dfrac{\Gamma\vdash^* t:\sigma \quad \sigma\le\rho}{\Gamma\vdash(t:\sigma):\rho}$</p>
 
@@ -1961,11 +2045,11 @@
         </li>
         
         
-        <li id="section-76">
+        <li id="section-79">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-76">&#182;</a>
+                <a class="pilcrow" href="#section-79">&#182;</a>
               </div>
               <p>INFER-ANN: $\dfrac{\Gamma\vdash^* t:\sigma \quad \sigma\le\sim\rho}{\Gamma\vdash(t:\sigma):\sim\rho}$</p>
 
@@ -1984,11 +2068,11 @@
         </li>
         
         
-        <li id="section-77">
+        <li id="section-80">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-77">&#182;</a>
+                <a class="pilcrow" href="#section-80">&#182;</a>
               </div>
               <h2 id="-">测试部分</h2>
 
@@ -2028,6 +2112,10 @@
 		<span class="hljs-keyword">if</span> (a[<span class="hljs-number">0</span>] === <span class="hljs-string">"let"</span>) {
 			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Let(
 				a.slice(<span class="hljs-number">1</span>, <span class="hljs-number">-1</span>).map(<span class="hljs-function"><span class="hljs-params">form</span> =&gt;</span> ({<span class="hljs-attr">name</span>: form[<span class="hljs-number">0</span>], <span class="hljs-attr">bind</span>: translate(form[<span class="hljs-number">1</span>])})),
+				translate(a[a.length - <span class="hljs-number">1</span>]));
+		} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (a[<span class="hljs-number">0</span>] === <span class="hljs-string">"letrec"</span>) {
+			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> LetRec(
+				a.slice(<span class="hljs-number">1</span>, <span class="hljs-number">-1</span>).map(<span class="hljs-function"><span class="hljs-params">form</span> =&gt;</span> ({<span class="hljs-attr">name</span>: form[<span class="hljs-number">0</span>], <span class="hljs-attr">bind</span>: translate(form[<span class="hljs-number">1</span>]), <span class="hljs-attr">type</span>: form[<span class="hljs-number">2</span>] ? translateType(form[<span class="hljs-number">2</span>]) : <span class="hljs-literal">null</span>})),
 				translate(a[a.length - <span class="hljs-number">1</span>]));
 		} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (a[<span class="hljs-number">0</span>] === <span class="hljs-string">"lambda"</span> &amp;&amp; a.length &gt;= <span class="hljs-number">3</span>) {
 			<span class="hljs-keyword">const</span> fn0 = translate(a[a.length - <span class="hljs-number">1</span>]);
@@ -2069,7 +2157,7 @@
 ]));
 
 <span class="hljs-keyword">const</span> a = translate(
-	[<span class="hljs-string">"let"</span>,
+	[<span class="hljs-string">"letrec"</span>,
 		[<span class="hljs-string">"even?"</span>, [<span class="hljs-string">"lambda"</span>, [<span class="hljs-string">"x"</span>, <span class="hljs-string">"int"</span>],
 			[<span class="hljs-string">"if"</span>, [<span class="hljs-string">"zero?"</span>, <span class="hljs-string">"x"</span>],
 				<span class="hljs-literal">true</span>,
@@ -2079,7 +2167,9 @@
 				<span class="hljs-literal">false</span>,
 				[<span class="hljs-string">"even?"</span>, [<span class="hljs-string">"-"</span>, <span class="hljs-string">"x"</span>, <span class="hljs-number">1</span>]]]]],
 		[<span class="hljs-string">"id"</span>, [<span class="hljs-string">"lambda"</span>, <span class="hljs-string">"x"</span>, <span class="hljs-string">"x"</span>]],
-		[<span class="hljs-string">"id_dyn"</span>, [<span class="hljs-string">"lambda"</span>, [<span class="hljs-string">"x"</span>, [<span class="hljs-string">"forall"</span>, [<span class="hljs-string">"'a"</span>], [<span class="hljs-string">"box"</span>, <span class="hljs-string">"'a"</span>]]], [<span class="hljs-string">"::"</span>, [<span class="hljs-string">"unbox"</span>, <span class="hljs-string">"x"</span>], <span class="hljs-string">"int"</span>]]],
+		[<span class="hljs-string">"id_dyn"</span>,
+			[<span class="hljs-string">"lambda"</span>, [<span class="hljs-string">"x"</span>, [<span class="hljs-string">"forall"</span>, [<span class="hljs-string">"'a"</span>], [<span class="hljs-string">"box"</span>, <span class="hljs-string">"'a"</span>]]], [<span class="hljs-string">"::"</span>, [<span class="hljs-string">"unbox"</span>, <span class="hljs-string">"x"</span>], <span class="hljs-string">"int"</span>]],
+			[<span class="hljs-string">"-&gt;"</span>, [<span class="hljs-string">"forall"</span>, [<span class="hljs-string">"'a"</span>], [<span class="hljs-string">"box"</span>, <span class="hljs-string">"'a"</span>]], <span class="hljs-string">"int"</span>]],
 		[<span class="hljs-string">"let"</span>,
 			[<span class="hljs-string">"strange"</span>,
 				[<span class="hljs-string">"lambda"</span>,
@@ -2091,11 +2181,11 @@
         </li>
         
         
-        <li id="section-78">
+        <li id="section-81">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-78">&#182;</a>
+                <a class="pilcrow" href="#section-81">&#182;</a>
               </div>
               <p>应当返回：<code>(int * boolean) * int</code></p>
 

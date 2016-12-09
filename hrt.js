@@ -921,10 +921,9 @@ class ALam extends Term {
 		return FunctionType(this.type, bodyTy);
 	}
 }
-// ### 递归 Let 绑定
+// ### 非递归 Let 绑定
 class Let extends Term {
 	/**
-	 * Recursive [let] construction
 	 * @param {Array<{name: string, bind: Term}>} terms
 	 * @param {Term} body
 	 */
@@ -933,27 +932,75 @@ class Let extends Term {
 		this.terms = terms;
 		this.body = body;
 	}
-	// CHECK-LETREC: $\dfrac{\Gamma, x:\mathrm{fresh}\vdash^* t: \sigma'\quad \Gamma, x:\sigma'\vdash u:\rho}{\Gamma\vdash(\mathbf{let\ rec}\ (x=t).u):\rho}$
+	// CHECK-LETREC: $\dfrac{\Gamma\vdash^* t: \sigma'\quad \Gamma, x:\sigma'\vdash u:\rho}{\Gamma\vdash(\mathbf{let}\ (x=t).u):\rho}$
 	/**
 	 * @param{Environment} env
 	 * @param{Type} expected
 	 */
 	_checkRho(env, expected) {
-		const env1TypeBindings = this.terms.map(({name}) => ({name, type: new MetaSlot(env.newMetaSlotVal())}));
-		const env1 = env.extendN(env1TypeBindings);
-		const varTys = this.terms.map(({name, bind}) => ({name, type: bind.inferSigma(env1)}));
-		const env2 = env.extendN(varTys);
-		return this.body.checkRho(env2, expected);
+		const varTys = this.terms.map(({name, bind}) => ({name, type: bind.inferSigma(env)}));
+		const env1 = env.extendN(varTys);
+		return this.body.checkRho(env1, expected);
 	}
-	// INFER-LETREC: $\dfrac{\Gamma, x:\mathrm{fresh}\vdash^* t:\sim \sigma'\quad \Gamma, x:\sigma'\vdash u:\sim\rho}{\Gamma\vdash(\mathbf{let\ rec}\ (x=t).u):\sim\rho}$
+	// INFER-LETREC: $\dfrac{\Gamma\vdash^* t:\sim \sigma'\quad \Gamma, x:\sigma'\vdash u:\sim\rho}{\Gamma\vdash(\mathbf{let}\ (x=t).u):\sim\rho}$
 	/**
 	 * @param{Environment} env
 	 * @returns{Type} 
 	 */
 	_inferRho(env) {
-		const env1TypeBindings = this.terms.map(({name}) => ({name, type: new MetaSlot(env.newMetaSlotVal())}));
+		const varTys = this.terms.map(({name, bind}) => ({name, type: bind.inferSigma(env)}));
+		const env1 = env.extendN(varTys);
+		return this.body.inferRho(env1);
+	}
+}
+// ### 递归 Let 绑定
+class LetRec extends Term {
+	/**
+	 * @param {Array<{name: string, bind: Term, type: Type?}>} terms
+	 * @param {Term} body
+	 */
+	constructor(terms, body) {
+		super();
+		this.terms = terms;
+		this.body = body;
+	}
+	// CHECK-LETREC1: $\dfrac{\Gamma, x:\mathrm{fresh}\vdash^* t: \sigma'\quad \Gamma, x:\sigma'\vdash u:\rho}{\Gamma\vdash(\mathbf{let\ rec}\ (x=t).u):\rho}$
+	// 
+	// CHECK-LETREC2: $\dfrac{\Gamma, x:\sigma\vdash^* t: \sigma'\quad \Gamma, x:\sigma'\vdash u:\rho}{\Gamma\vdash(\mathbf{let\ rec}\ (x:\sigma=t).u):\rho}$
+	/**
+	 * @param{Environment} env
+	 * @param{Type} expected
+	 */
+	_checkRho(env, expected) {
+		const env1TypeBindings = this.terms.map(({name, type}) => ({
+			name,
+			type: type || new MetaSlot(env.newMetaSlotVal())
+		}));
 		const env1 = env.extendN(env1TypeBindings);
 		const varTys = this.terms.map(({name, bind}) => ({name, type: bind.inferSigma(env1)}));
+		const env2 = env.extendN(varTys);
+		return this.body.checkRho(env2, expected);
+	}
+	// INFER-LETREC1: $\dfrac{\Gamma, x:\mathrm{fresh}\vdash^* t:\sim \sigma'\quad \Gamma, x:\sigma'\vdash u:\sim\rho}{\Gamma\vdash(\mathbf{let\ rec}\ (x=t).u):\sim\rho}$
+	//
+	// INFER-LETREC2: $\dfrac{\Gamma, x:\sigma\vdash^* t:\sim \sigma'\quad \Gamma, x:\sigma'\vdash u:\sim\rho}{\Gamma\vdash(\mathbf{let\ rec}\ (x:\sigma=t).u):\sim\rho}$
+	/**
+	 * @param{Environment} env
+	 * @returns{Type} 
+	 */
+	_inferRho(env) {
+		const env1TypeBindings = this.terms.map(({name, type}) => ({
+			name,
+			type: type || new MetaSlot(env.newMetaSlotVal())
+		}));
+		const env1 = env.extendN(env1TypeBindings);
+		const varTys = this.terms.map(({name, bind, type}) => {
+			const inferredType = bind.inferSigma(env1);
+			if (type) {
+				type.subsCheck(env, inferredType);
+			}
+			return {name, type: inferredType};
+		});
 		const env2 = env.extendN(varTys);
 		return this.body.inferRho(env2);
 	}
@@ -1025,6 +1072,10 @@ function translate(a) {
 			return new Let(
 				a.slice(1, -1).map(form => ({name: form[0], bind: translate(form[1])})),
 				translate(a[a.length - 1]));
+		} else if (a[0] === "letrec") {
+			return new LetRec(
+				a.slice(1, -1).map(form => ({name: form[0], bind: translate(form[1]), type: form[2] ? translateType(form[2]) : null})),
+				translate(a[a.length - 1]));
 		} else if (a[0] === "lambda" && a.length >= 3) {
 			const fn0 = translate(a[a.length - 1]);
 			return a.slice(1, -1).reduceRight((fn, term) => (typeof term === "string")
@@ -1065,7 +1116,7 @@ const env = new Environment({ val: 0 }, new Map([
 ]));
 
 const a = translate(
-	["let",
+	["letrec",
 		["even?", ["lambda", ["x", "int"],
 			["if", ["zero?", "x"],
 				true,
@@ -1075,7 +1126,9 @@ const a = translate(
 				false,
 				["even?", ["-", "x", 1]]]]],
 		["id", ["lambda", "x", "x"]],
-		["id_dyn", ["lambda", ["x", ["forall", ["'a"], ["box", "'a"]]], ["::", ["unbox", "x"], "int"]]],
+		["id_dyn",
+			["lambda", ["x", ["forall", ["'a"], ["box", "'a"]]], ["::", ["unbox", "x"], "int"]],
+			["->", ["forall", ["'a"], ["box", "'a"]], "int"]],
 		["let",
 			["strange",
 				["lambda",
