@@ -43,6 +43,9 @@ h1 {
 h2 {
   font-size: 1.5em;
 }
+.pilwrap + p, .pilwrap+h2,.pilwrap+h3,.pilwrap+h4{
+  margin-top: 0;
+}
 
 hr {
   border: 0;

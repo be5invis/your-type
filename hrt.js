@@ -3,8 +3,10 @@
 // 
 // 此算法的逻辑学表述可参见文献 31 页，Haskell 代码可参见其附件。这份 JavaScript 代码由其 Haskell 版本改写而来。
 
-const util = require("util");
 
+
+
+const util = require("util");
 
 // ## 第一部分，环境 $\Gamma$
 // 我们使用「环境」来处理嵌套的作用域。每个环境包含两个部分：
@@ -19,6 +21,7 @@ class Environment {
 		this.uniqs = uniqs;
 		this.variables = variables;
 	}
+	// #### extend :: this Environment × string × Type → Environment
 	// 创建一个扩展环境 $(x:t)\Gamma$，增加一个变量
 	/**
 	 * @param {string} name
@@ -29,6 +32,7 @@ class Environment {
 		v1.set(name, type);
 		return new Environment(this.uniqs, v1);
 	}
+	// #### extendN :: this Environment × [{name: string, type: Type}] → Environment
 	// 创建一个扩展环境 $(\overline{x:t})\Gamma$，增加一组变量。此函数用于 let rec 的构建
 	/**
 	 * @param {{name: string, type: Type}[]} terms
@@ -40,6 +44,7 @@ class Environment {
 		}
 		return new Environment(this.uniqs, v1);
 	}
+	// #### lookup :: this Environment × string → Type
 	// 查找名称定义
 	/**
 	 * @param {string} name
@@ -52,26 +57,32 @@ class Environment {
 			throw new Error(`Variable ${name} not found.`);
 		}
 	}
-	// 生成计数器
+	// #### newUnique :: this Environment → number
+	// 增加计数器，生成唯一性的数值
 	newUnique() {
 		this.uniqs.val += 1;
 		return this.uniqs.val;
 	}
+	// #### newMetaSlotVal :: this Environment → MetaSlotVal
 	// 生成新的 Meta slot value
 	newMetaSlotVal() {
 		const u = this.newUnique();
 		const ref = { val: null };
 		return new MetaSlotVal(u, ref);
 	}
+	// #### newSkolemVariable :: this Environment → string
 	// 生成新的 Skolem slot 名称
 	newSkolemVariable(s) {
 		const u = this.newUnique();
 		return rawNameToSkolemisedName(u, s);
 	}
+	// #### getTypes :: this Environment → IterableIterator Type
 	// 获得所有已定义变量的类型列表
 	getTypes() {
 		return this.variables.values();
 	}
+
+	// #### getTypes :: this Environment → IterableIterator [number, MetaSlot]
 	// 获得当前环境中所有已定义变量类型中的所有 Meta slot
 	/**
 	 * @param{IterableIterator<Type>} tys
@@ -82,6 +93,7 @@ class Environment {
 			yield* type1.getMetaSlots();
 		}
 	}
+	// #### getTypes :: this Environment × → IterableIterator string
 	// 获得当前环境中所有已定义变量类型中的所有自由 slot
 	/**
 	 * @param{IterableIterator<Type>} tys
@@ -122,10 +134,10 @@ class Type {
 	constructor() {}
 	// #### Pretty-print
 	inspect() {}
-	// #### getMetaSlots
+	// #### getMetaSlots :: this Type → Map number MetaSlot
 	// 获取当前类型中所有出现的 Meta slot。返回一个 number 到 meta slot 的映射
 	/**
-	 * @returns {Map<number, Type>}
+	 * @returns {Map<number, MetaSlot>}
 	 */
 	getMetaSlots() {
 		let a = new Map;
@@ -133,7 +145,7 @@ class Type {
 		return a;
 	}
 	_getMetaSlots(a) {}
-	// #### getFreeSlots
+	// #### getFreeSlots :: this Type → Set string
 	// 获取当前类型中所有出现的未绑定 slot。
 	/**
 	 * Get all free slots
@@ -146,6 +158,7 @@ class Type {
 		return a;
 	}
 	_getFreeSlots(bound, a) {}
+	// #### getBinders :: this Type → Set string
 	// 获取当前类型中所有 forall 使用的 binder
 	/**
 	 * @returns{Set<string>}
@@ -156,6 +169,7 @@ class Type {
 		return a;
 	}
 	_getBinders() {}
+	// #### subst :: this Type × Map string Type → Type
 	// 根据 m 的要求，替换一些 slot 的内容
 	/**
 	 * @param {Map<string, Type>} m
@@ -164,7 +178,7 @@ class Type {
 	subst(m) {
 		return this;
 	}
-	// #### 实例化
+	// #### instantiate :: this Type × Environment → Type
 	// 在环境 env 中，实例化当前的多态类型。它会去除顶层的 $\forall$ 符号。
 	/**
 	 * @param {Environment} env
@@ -173,7 +187,7 @@ class Type {
 	instantiate(env) {
 		return this;
 	}
-	// #### 深斯科伦化
+	// #### skolemise :: this Type × Environment → {map: Map string Slot, type: Type}
 	// 在当前环境 env 中，产生当前类型的一个斯科伦范式形式。它可以看作实例化的递归版本，会展开每一层的多态，同时会返回新产生的临时变量的表（这里使用一个名字到 Slot 的 Map 实现）。我们不会展开复合类型的前件，避免错误地捕捉变量。此过程产生的类型必然保证：所有符合构造的后件不包含任何的多态。
 	// 
 	// 一个实例是：$\mathrm{skolmeise}(\forall a.a\rightarrow(\forall b.b\rightarrow b))=\forall t_1 t_2. t_1 \rightarrow (t_2 \rightarrow t_2)$
@@ -187,14 +201,14 @@ class Type {
 			type: this
 		};
 	}
-	// #### 泛化
+	// #### generalize :: this Type × Environment × [MetaSlotVal] → ForAll
 	// 在当前环境 env 中，根据 mvs 列表泛化当前类型。将返回一个多态类型。
 	/**
 	 * @param {Environment} env
 	 * @param {Array<MetaSlotVal>} mvs
 	 * @returns {ForAll}
 	 */
-	quantify(env, mvs) {
+	generalize(env, mvs) {
 		let usedBinders = this.getBinders();
 		let nRef = { val: 0 };
 		let newBinders = [];
@@ -205,7 +219,7 @@ class Type {
 		}
 		return new ForAll(newBinders.map(x => x.name), this.zonk(env));
 	}
-	// #### 简化（Zonking）
+	// #### zonk :: this Type × Environment → Type
 	// 消除掉当前类型中所有的 Meta Slot。
 	/**
 	 * @param {Environment} env
@@ -214,14 +228,17 @@ class Type {
 	zonk(env) {
 		return this;
 	}
-	// #### Sigma-实例化
+	// #### instSigmaInfer :: this Type × Environment → Type
+	// 在类型推理时，生成一个实例化的版本
 	/**
 	 * @param{Environment} env
 	 * @returns{Type}
 	 */
-	instSigmaInfer(env, exp) {
+	instSigmaInfer(env) {
 		return this.instantiate(env);
 	}
+	// #### instSigmaCheck :: this Type × Environment × Type → boolean
+	// 在类型推理时，检查本类型是否符合需求
 	/**
 	 * @param{Environment} env
 	 * @param{Type} expected
@@ -229,7 +246,7 @@ class Type {
 	instSigmaCheck(env, expected) {
 		return this.subsCheckRho(env, expected);
 	}
-	// #### 小前提检查
+	// #### subsCheck :: this Type × Environment × Type → boolean <br> subsCheckRho :: this Type × Environment × Type → boolean
 	// 判断某个类型是否比另一个类型更加「泛化」。
 	// 我们把它拆分成两个部分：$\rm subsCheck$ 和 $\rm subsCheckRho$，前者处理两个 $\sigma$ 类型，后者处理一个 $\sigma$ 类型和一个 $\rho$ 类型。
 	/**
@@ -239,9 +256,9 @@ class Type {
 	subsCheck(env, that) {
 		// ${\rm subsCheck}(\sigma_1, \sigma_2)$ 成立，当且仅当：
 		const {map: skolTvs, type: rho2} = that.skolemise(env);
-		// ${\rm subsCheckRho}(\sigma_1, \mathrm{skolmeise}(\sigma_2).\mathrm{type}) $
+		//  - ${\rm subsCheckRho}(\sigma_1, \mathrm{skolmeise}(\sigma_2).\mathrm{type}) $
 		this.subsCheckRho(env, rho2);
-		// 并且，$\sigma_1$ 的自由变量中，$\sigma_2$ 中的对应者没有被「提出来」。
+		//  - 并且，$\sigma_1$ 的自由变量中，$\sigma_2$ 中的对应者没有被「提出来」。
 		const escTvs = new Set(env.getAllFreeSlots([this]));
 		for (let [k, v] of skolTvs) {
 			if (escTvs.has(rawNameOfSkolemisedName(k))) {
@@ -264,6 +281,7 @@ class Type {
 	}
 }
 
+// #### subsCheckComposite :: Environment × boolean × Type × Type × Type × Type → boolean
 // 复合类型的小前提检查，注意反变性
 function subsCheckComposite(env, contravariant, f1, f2, a1, a2) {
 	f1.subsCheck(env, f2);
@@ -274,6 +292,7 @@ function subsCheckComposite(env, contravariant, f1, f2, a1, a2) {
 	}
 }
 
+// #### generateBinder :: ref number × Set string → string
 // 获取新的名字，用于泛化过程中的重命名
 function generateBinder(nRef, used) {
 	nRef.val += 1;
@@ -541,6 +560,10 @@ class MetaSlotVal {
 
 
 // ## 第三部分，合一
+
+
+// ### unify :: type × type → boolean
+// 尝试合一两个类型，成功返回 true，否则报错。
 /**
  * @param {Type} t1
  * @param {Type} t2
@@ -567,7 +590,8 @@ function unify(t1, t2) {
 function badtype(t) {
 	return t instanceof Slot && !t.isSkolem();
 }
-// ### Meta slot 的合一，一般情况
+// ### unifyMetaSlot :: MetaSlotVal × Type → boolean
+// Meta slot 的合一，一般情况
 /**
  * @param {MetaSlotVal} msv
  * @param {Type} ty
@@ -579,7 +603,8 @@ function unifyMetaSlot(msv, ty) {
 		return unifyUnbound(msv, ty);
 	}
 }
-// ### Meta slot 的合一，未绑定情况
+// ### unifyUnbound :: MetaSlotVal × Type → boolean
+// Meta slot 的合一，未绑定情况
 /**
  * @param {MetaSlotVal} msv
  * @param {Type} ty
@@ -604,14 +629,18 @@ function unifyUnbound(msv, ty) {
 	}
 }
 
-// ### 合一到函数
+// ### unifyFun :: Type × Environment → boolean
+// 合一类型到函数
 /**
  * @param {Type} type
  * @param {Environment} env
  * @returns {[Type, Type]}
  */
 function unifyFun(type, env) {
-	if (type instanceof Composite && type.fn instanceof Composite && type.fn.fn instanceof Primitive && type.fn.fn.name === "->") {
+	if (type instanceof Composite
+		&& type.fn instanceof Composite
+		&& type.fn.fn instanceof Primitive
+		&& type.fn.fn.name === "->") {
 		return [type.fn.arg, type.arg];
 	} else {
 		const argMs = new MetaSlot(env.newMetaSlotVal());
@@ -620,15 +649,15 @@ function unifyFun(type, env) {
 		return [argMs, resMs];
 	}
 }
+
+// ### FunctionType :: Type × Type → Type
+// 构造一个函数类型
 function FunctionType(arg, body) {
-	return new Composite(
-		new Composite(new Primitive("->"), arg, true),
-		body,
-		false
-	);
+	return new Composite(new Composite(new Primitive("->"), arg, true), body, false);
 }
 
-// ### 合一到复合类型
+// ### unifyComposite :: Type × Environment → boolean
+// 合一类型到任意复合类型
 /**
  * @param {Type} type
  * @param {Environment} env
@@ -656,7 +685,8 @@ class Term {
 	isAtomic() {
 		return false;
 	}
-	// #### checkRho：在环境 env 中检查当前表达式是否符合 $\rho$ 类型 type
+	// #### checkRho :: this Term × Environment × Type → boolean
+	// 在环境 env 中检查当前表达式是否符合 $\rho$ 类型 type
 	/**
 	 * @param {Environment} env
 	 * @param {Type} type
@@ -665,7 +695,8 @@ class Term {
 	checkRho(env, type) {
 		return this._checkRho(env, type);
 	}
-	// #### inferRho：在环境 env 中推理，尝试得到 $\rho$ 类型（或者报错）
+	// #### inferRho :: this Term × Environment → Type
+	// 在环境 env 中推理，尝试得到 $\rho$ 类型（或者报错）
 	/**
 	 * @param {Environment} env
 	 * @returns {Type}
@@ -677,7 +708,8 @@ class Term {
 		return t;
 	}
 
-	// #### checkSigma：在环境 env 中检查当前表达式是否符合 $\sigma$ 类型 type
+	// #### checkSigma :: this Term × Environment × Type → boolean
+	// 在环境 env 中检查当前表达式是否符合 $\sigma$ 类型 type
 	/**
 	 * @param{Environment} env
 	 * @param{Type} sigma
@@ -695,7 +727,8 @@ class Term {
 		return true;
 	}
 
-	// #### inferSigma：在环境 env 中推理，尝试得到 $\sigma$ 类型（或者报错）
+	// #### inferSigma :: this Term × Environment → Type
+	// 在环境 env 中推理，尝试得到 $\sigma$ 类型（或者报错）
 	/**
 	 * @param{Environment} env
 	 * @returns{Type}
@@ -708,7 +741,7 @@ class Term {
 		for (let [id, v] of envMsvs) {
 			resMsvs.delete(id);
 		}
-		return expTy.quantify(env, Array.from(resMsvs.values()));
+		return expTy.generalize(env, Array.from(resMsvs.values()));
 	}
 }
 // ### 直接量
