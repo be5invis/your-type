@@ -340,6 +340,16 @@ class Environment {
 		return new Environment(this.uniqs, v1);
 	}
 	/**
+	 * @param {{name: string, type: Type}[]} terms
+	 */
+	extendN(terms) {
+		let v1 = new Map(this.variables);
+		for (let {name, type} of terms) {
+			v1.set(name, type);
+		}
+		return new Environment(this.uniqs, v1);
+	}
+	/**
 	 * @param {string} name
 	 * @returns {Type}
 	 */
@@ -564,6 +574,8 @@ class Lit extends Term {
 			return new Primitive("int").instSigma(env, exp);
 		} else if (typeof this.lit === "string") {
 			return new Primitive("str").instSigma(env, exp);
+		} else if (typeof this.lit === "boolean") {
+			return new Primitive("boolean").instSigma(env, exp);
 		} else {
 			return new Primitive("unit").instSigma(env, exp);
 		}
@@ -666,23 +678,24 @@ class ALam extends Term {
 }
 class Let extends Term {
 	/**
-	 * @param {string} name
-	 * @param {Term} bind
+	 * Recursive [let] construction
+	 * @param {Array<{name: string, bind: Term}>} terms
 	 * @param {Term} body
 	 */
-	constructor(name, bind, body) {
+	constructor(terms, body) {
 		super();
-		this.name = name;
-		this.bind = bind;
+		this.terms = terms;
 		this.body = body;
 	}
 	/**
 	 * @param{Environment} env
 	 */
 	tcRho(env, exp) {
-		const env1 = env.extend(this.name, new MetaSlot(env.newMetaSlotVal()));
-		const varTy = this.bind.inferSigma(env1);
-		const env2 = env.extend(this.name, varTy);
+		// Step 1: add names
+		const env1TypeBindings = this.terms.map(({name}) => ({name, type: new MetaSlot(env.newMetaSlotVal())}));
+		const env1 = env.extendN(env1TypeBindings);
+		const varTys = this.terms.map(({name, bind}) => ({name, type: bind.inferSigma(env1)}));
+		const env2 = env.extendN(varTys);
 		return this.body.tcRho(env2, exp);
 	}
 }
@@ -735,7 +748,9 @@ function translate(a) {
 		return new Lit(a);
 	} else if (a instanceof Array) {
 		if (a[0] === "let") {
-			return new Let(a[1], translate(a[2]), translate(a[3]));
+			return new Let(
+				a.slice(1, -1).map(form => ({name: form[0], bind: translate(form[1])})),
+				translate(a[a.length - 1]));
 		} else if (a[0] === "lambda" && a.length >= 3) {
 			const fn0 = translate(a[a.length - 1]);
 			return a.slice(1, -1).reduceRight((fn, term) => (typeof term === "string")
@@ -761,7 +776,9 @@ const env = new Environment({ val: 0 }, new Map([
 			["->", "'b",
 				["*", "'a", "'b"]]]])],
 	["+", translateType(["->", "int", ["->", "int", "int"]])],
+	["-", translateType(["->", "int", ["->", "int", "int"]])],
 	["empty?", translateType(["forall", ["'a"], ["->", ["list", '"a'], "bool"]])],
+	["zero?", translateType(["->", "int", "bool"])],
 	["cdr", translateType(["forall", ["'a"], ["->", ["list", '"a'], ["list", "'a"]]])],
 	["if", translateType(["forall", ["'a"], ["->",
 		"bool",
@@ -771,11 +788,15 @@ const env = new Environment({ val: 0 }, new Map([
 
 const a = translate(
 	["let",
-		"length", ["lambda", "list",
-			["if", ["empty?", "list"],
-				0,
-				["+", 1, ["length", ["cdr", "list"]]]]],
-		["length", "somelist"]]
+		["even?", ["lambda", ["x", "int"],
+			["if", ["zero?", "x"],
+				true,
+				["odd?", ["-", "x", 1]]]]],
+		["odd?", ["lambda", ["x", "int"],
+			["if", ["zero?", "x"],
+				false,
+				["even?", ["-", "x", 1]]]]],
+		["even?", 5]]
 );
 
 console.log(util.inspect(a.inferSigma(env), { depth: null }));
