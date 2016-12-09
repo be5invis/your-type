@@ -2075,6 +2075,7 @@
                 <a class="pilcrow" href="#section-80">&#182;</a>
               </div>
               <h2 id="-">测试部分</h2>
+<h4 id="translatetype-any-type">translateType :: [any] → Type</h4>
 
             </div>
             
@@ -2088,8 +2089,46 @@
 				a[<span class="hljs-number">1</span>].map(<span class="hljs-function"><span class="hljs-params">x</span> =&gt;</span> translateType(x).name),
 				translateType(a[<span class="hljs-number">2</span>])
 			);
-		} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (a.length === <span class="hljs-number">2</span>) {
-			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Composite(translateType(a[<span class="hljs-number">0</span>]), translateType(a[<span class="hljs-number">1</span>]), a[<span class="hljs-number">0</span>] === <span class="hljs-string">"-&gt;"</span> ? <span class="hljs-literal">true</span> : <span class="hljs-literal">false</span>);
+		} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (a[<span class="hljs-number">0</span>] === <span class="hljs-string">"exists"</span>) {</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-81">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-81">&#182;</a>
+              </div>
+              <p>Existential 类型可以用普通的多态类型模拟</p>
+<p>$\exists \overline x. \rho = \forall Q. (\forall \overline x. \rho \rightarrow Q)\rightarrow Q$</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> ForAll([<span class="hljs-string">"Q"</span>],
+				FunctionType(<span class="hljs-keyword">new</span> ForAll(
+					a[<span class="hljs-number">1</span>].map(<span class="hljs-function"><span class="hljs-params">x</span> =&gt;</span> translateType(x).name),
+					FunctionType(translateType(a[<span class="hljs-number">2</span>]), <span class="hljs-keyword">new</span> Slot(<span class="hljs-string">"Q"</span>))
+				), <span class="hljs-keyword">new</span> Slot(<span class="hljs-string">"Q"</span>)));
+		} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (a.length === <span class="hljs-number">2</span>) {</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-82">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-82">&#182;</a>
+              </div>
+              <p>我们目前只知道 $\rightarrow$ 是反变的，因此只处理这一种情况。</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Composite(
+				translateType(a[<span class="hljs-number">0</span>]),
+				translateType(a[<span class="hljs-number">1</span>]),
+				a[<span class="hljs-number">0</span>] === <span class="hljs-string">"-&gt;"</span> ? <span class="hljs-literal">true</span> : <span class="hljs-literal">false</span>);
 		} <span class="hljs-keyword">else</span> {
 			<span class="hljs-keyword">const</span> fnpart = translateType(a.slice(<span class="hljs-number">0</span>, <span class="hljs-number">-1</span>));
 			<span class="hljs-keyword">const</span> argpart = translateType(a[a.length - <span class="hljs-number">1</span>]);
@@ -2100,9 +2139,22 @@
 	} <span class="hljs-keyword">else</span> {
 		<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Primitive(a);
 	}
-}
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-83">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-83">&#182;</a>
+              </div>
+              <h4 id="translate-any-term">translate :: [any] → Term</h4>
 
-<span class="hljs-comment">/**
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-comment">/**
  * @returns{Term}
  */</span>
 <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">translate</span>(<span class="hljs-params">a</span>) </span>{
@@ -2115,7 +2167,11 @@
 				translate(a[a.length - <span class="hljs-number">1</span>]));
 		} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (a[<span class="hljs-number">0</span>] === <span class="hljs-string">"letrec"</span>) {
 			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> LetRec(
-				a.slice(<span class="hljs-number">1</span>, <span class="hljs-number">-1</span>).map(<span class="hljs-function"><span class="hljs-params">form</span> =&gt;</span> ({<span class="hljs-attr">name</span>: form[<span class="hljs-number">0</span>], <span class="hljs-attr">bind</span>: translate(form[<span class="hljs-number">1</span>]), <span class="hljs-attr">type</span>: form[<span class="hljs-number">2</span>] ? translateType(form[<span class="hljs-number">2</span>]) : <span class="hljs-literal">null</span>})),
+				a.slice(<span class="hljs-number">1</span>, <span class="hljs-number">-1</span>).map(<span class="hljs-function"><span class="hljs-params">form</span> =&gt;</span> ({
+					<span class="hljs-attr">name</span>: form[<span class="hljs-number">0</span>],
+					<span class="hljs-attr">bind</span>: translate(form[<span class="hljs-number">1</span>]),
+					<span class="hljs-attr">type</span>: form[<span class="hljs-number">2</span>] ? translateType(form[<span class="hljs-number">2</span>]) : <span class="hljs-literal">null</span>
+				})),
 				translate(a[a.length - <span class="hljs-number">1</span>]));
 		} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (a[<span class="hljs-number">0</span>] === <span class="hljs-string">"lambda"</span> &amp;&amp; a.length &gt;= <span class="hljs-number">3</span>) {
 			<span class="hljs-keyword">const</span> fn0 = translate(a[a.length - <span class="hljs-number">1</span>]);
@@ -2136,9 +2192,22 @@
 	} <span class="hljs-keyword">else</span> {
 		<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Lit(a);
 	}
-}
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-84">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-84">&#182;</a>
+              </div>
+              <p>测试：「全局变量」表</p>
 
-<span class="hljs-keyword">const</span> env = <span class="hljs-keyword">new</span> Environment({ <span class="hljs-attr">val</span>: <span class="hljs-number">0</span> }, <span class="hljs-keyword">new</span> <span class="hljs-built_in">Map</span>([
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-keyword">const</span> env = <span class="hljs-keyword">new</span> Environment({ <span class="hljs-attr">val</span>: <span class="hljs-number">0</span> }, <span class="hljs-keyword">new</span> <span class="hljs-built_in">Map</span>([
 	[<span class="hljs-string">"&amp;"</span>, translateType([<span class="hljs-string">"forall"</span>, [<span class="hljs-string">"'a"</span>, <span class="hljs-string">"'b"</span>],
 		[<span class="hljs-string">"-&gt;"</span>, <span class="hljs-string">"'a"</span>,
 			[<span class="hljs-string">"-&gt;"</span>, <span class="hljs-string">"'b"</span>,
@@ -2152,11 +2221,25 @@
 		<span class="hljs-string">"bool"</span>,
 		[<span class="hljs-string">"-&gt;"</span>, <span class="hljs-string">"'a"</span>, [<span class="hljs-string">"-&gt;"</span>, <span class="hljs-string">"'a"</span>, <span class="hljs-string">"'a"</span>]]]])],
 	[<span class="hljs-string">"somelist"</span>, translateType([<span class="hljs-string">"list"</span>, <span class="hljs-string">"int"</span>])],
-	[<span class="hljs-string">"box"</span>, translateType([<span class="hljs-string">"forall"</span>, [<span class="hljs-string">"'t"</span>], [<span class="hljs-string">"-&gt;"</span>, <span class="hljs-string">"'t"</span>, [<span class="hljs-string">"forall"</span>, [<span class="hljs-string">"'a"</span>], [<span class="hljs-string">"box"</span>, <span class="hljs-string">"'a"</span>]]]])],
-	[<span class="hljs-string">"unbox"</span>, translateType([<span class="hljs-string">"forall"</span>, [<span class="hljs-string">"'t"</span>], [<span class="hljs-string">"-&gt;"</span>, [<span class="hljs-string">"forall"</span>, [<span class="hljs-string">"'a"</span>], [<span class="hljs-string">"box"</span>, <span class="hljs-string">"'a"</span>]], <span class="hljs-string">"'t"</span>]])]
-]));
+	[<span class="hljs-string">"box"</span>, translateType([<span class="hljs-string">"forall"</span>, [<span class="hljs-string">"'t"</span>], [<span class="hljs-string">"-&gt;"</span>, <span class="hljs-string">"'t"</span>, [<span class="hljs-string">"exists"</span>, [<span class="hljs-string">"'a"</span>], [<span class="hljs-string">"box"</span>, <span class="hljs-string">"'a"</span>]]]])],
+	[<span class="hljs-string">"box_list"</span>, translateType([<span class="hljs-string">"forall"</span>, [<span class="hljs-string">"'t"</span>], [<span class="hljs-string">"-&gt;"</span>, <span class="hljs-string">"'t"</span>, [<span class="hljs-string">"exists"</span>, [<span class="hljs-string">"'a"</span>], [<span class="hljs-string">"box"</span>, [<span class="hljs-string">"list"</span>, <span class="hljs-string">"'a"</span>]]]]])],
+	[<span class="hljs-string">"unbox"</span>, translateType([<span class="hljs-string">"forall"</span>, [<span class="hljs-string">"'t"</span>], [<span class="hljs-string">"-&gt;"</span>, [<span class="hljs-string">"exists"</span>, [<span class="hljs-string">"'a"</span>], [<span class="hljs-string">"box"</span>, <span class="hljs-string">"'a"</span>]], <span class="hljs-string">"'t"</span>]])]
+]));</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-85">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-85">&#182;</a>
+              </div>
+              <p>测试：程序</p>
 
-<span class="hljs-keyword">const</span> a = translate(
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-keyword">const</span> a = translate(
 	[<span class="hljs-string">"letrec"</span>,
 		[<span class="hljs-string">"even?"</span>, [<span class="hljs-string">"lambda"</span>, [<span class="hljs-string">"x"</span>, <span class="hljs-string">"int"</span>],
 			[<span class="hljs-string">"if"</span>, [<span class="hljs-string">"zero?"</span>, <span class="hljs-string">"x"</span>],
@@ -2168,24 +2251,26 @@
 				[<span class="hljs-string">"even?"</span>, [<span class="hljs-string">"-"</span>, <span class="hljs-string">"x"</span>, <span class="hljs-number">1</span>]]]]],
 		[<span class="hljs-string">"id"</span>, [<span class="hljs-string">"lambda"</span>, <span class="hljs-string">"x"</span>, <span class="hljs-string">"x"</span>]],
 		[<span class="hljs-string">"id_dyn"</span>,
-			[<span class="hljs-string">"lambda"</span>, [<span class="hljs-string">"x"</span>, [<span class="hljs-string">"forall"</span>, [<span class="hljs-string">"'a"</span>], [<span class="hljs-string">"box"</span>, <span class="hljs-string">"'a"</span>]]], [<span class="hljs-string">"::"</span>, [<span class="hljs-string">"unbox"</span>, <span class="hljs-string">"x"</span>], <span class="hljs-string">"int"</span>]],
-			[<span class="hljs-string">"-&gt;"</span>, [<span class="hljs-string">"forall"</span>, [<span class="hljs-string">"'a"</span>], [<span class="hljs-string">"box"</span>, <span class="hljs-string">"'a"</span>]], <span class="hljs-string">"int"</span>]],
+			[<span class="hljs-string">"lambda"</span>,
+				[<span class="hljs-string">"x"</span>, [<span class="hljs-string">"exists"</span>, [<span class="hljs-string">"'a"</span>], [<span class="hljs-string">"box"</span>, <span class="hljs-string">"'a"</span>]]],
+				[<span class="hljs-string">"::"</span>, [<span class="hljs-string">"unbox"</span>, <span class="hljs-string">"x"</span>], [<span class="hljs-string">"list"</span>, <span class="hljs-string">"int"</span>]]],
+			[<span class="hljs-string">"-&gt;"</span>, [<span class="hljs-string">"exists"</span>, [<span class="hljs-string">"'a"</span>], [<span class="hljs-string">"box"</span>, <span class="hljs-string">"'a"</span>]], [<span class="hljs-string">"list"</span>, <span class="hljs-string">"int"</span>]]],
 		[<span class="hljs-string">"let"</span>,
 			[<span class="hljs-string">"strange"</span>,
 				[<span class="hljs-string">"lambda"</span>,
 					[<span class="hljs-string">"f"</span>, [<span class="hljs-string">"forall"</span>, [<span class="hljs-string">"'a"</span>], [<span class="hljs-string">"-&gt;"</span>, <span class="hljs-string">"'a"</span>, <span class="hljs-string">"'a"</span>]]],
 					[<span class="hljs-string">"&amp;"</span>, [<span class="hljs-string">"f"</span>, <span class="hljs-number">1</span>], [<span class="hljs-string">"f"</span>, [<span class="hljs-string">"even?"</span>, <span class="hljs-number">5</span>]]]]],
-			[<span class="hljs-string">"&amp;"</span>, [<span class="hljs-string">"strange"</span>, <span class="hljs-string">"id"</span>], [<span class="hljs-string">"id_dyn"</span>, [<span class="hljs-string">"box"</span>, <span class="hljs-number">1</span>]]]]]
+			[<span class="hljs-string">"&amp;"</span>, [<span class="hljs-string">"strange"</span>, <span class="hljs-string">"id"</span>], [<span class="hljs-string">"id_dyn"</span>, [<span class="hljs-string">"box_list"</span>, <span class="hljs-number">1</span>]]]]]
 );</pre></div></div>
             
         </li>
         
         
-        <li id="section-81">
+        <li id="section-86">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-81">&#182;</a>
+                <a class="pilcrow" href="#section-86">&#182;</a>
               </div>
               <p>应当返回：<code>(int * boolean) * int</code></p>
 

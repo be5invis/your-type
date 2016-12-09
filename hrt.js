@@ -1037,6 +1037,7 @@ class Ann extends Term {
 }
 
 // ## 测试部分
+// #### translateType :: [any] → Type
 /**
  * @returns{Type}
  */
@@ -1047,8 +1048,21 @@ function translateType(a) {
 				a[1].map(x => translateType(x).name),
 				translateType(a[2])
 			);
+		} else if (a[0] === "exists") {
+			// Existential 类型可以用普通的多态类型模拟
+			// 
+			// $\exists \overline x. \rho = \forall Q. (\forall \overline x. \rho \rightarrow Q)\rightarrow Q$
+			return new ForAll(["Q"],
+				FunctionType(new ForAll(
+					a[1].map(x => translateType(x).name),
+					FunctionType(translateType(a[2]), new Slot("Q"))
+				), new Slot("Q")));
 		} else if (a.length === 2) {
-			return new Composite(translateType(a[0]), translateType(a[1]), a[0] === "->" ? true : false);
+			// 我们目前只知道 $\rightarrow$ 是反变的，因此只处理这一种情况。
+			return new Composite(
+				translateType(a[0]),
+				translateType(a[1]),
+				a[0] === "->" ? true : false);
 		} else {
 			const fnpart = translateType(a.slice(0, -1));
 			const argpart = translateType(a[a.length - 1]);
@@ -1061,6 +1075,7 @@ function translateType(a) {
 	}
 }
 
+// #### translate :: [any] → Term
 /**
  * @returns{Term}
  */
@@ -1074,7 +1089,11 @@ function translate(a) {
 				translate(a[a.length - 1]));
 		} else if (a[0] === "letrec") {
 			return new LetRec(
-				a.slice(1, -1).map(form => ({name: form[0], bind: translate(form[1]), type: form[2] ? translateType(form[2]) : null})),
+				a.slice(1, -1).map(form => ({
+					name: form[0],
+					bind: translate(form[1]),
+					type: form[2] ? translateType(form[2]) : null
+				})),
 				translate(a[a.length - 1]));
 		} else if (a[0] === "lambda" && a.length >= 3) {
 			const fn0 = translate(a[a.length - 1]);
@@ -1097,6 +1116,7 @@ function translate(a) {
 	}
 }
 
+// 测试：「全局变量」表
 const env = new Environment({ val: 0 }, new Map([
 	["&", translateType(["forall", ["'a", "'b"],
 		["->", "'a",
@@ -1111,10 +1131,12 @@ const env = new Environment({ val: 0 }, new Map([
 		"bool",
 		["->", "'a", ["->", "'a", "'a"]]]])],
 	["somelist", translateType(["list", "int"])],
-	["box", translateType(["forall", ["'t"], ["->", "'t", ["forall", ["'a"], ["box", "'a"]]]])],
-	["unbox", translateType(["forall", ["'t"], ["->", ["forall", ["'a"], ["box", "'a"]], "'t"]])]
+	["box", translateType(["forall", ["'t"], ["->", "'t", ["exists", ["'a"], ["box", "'a"]]]])],
+	["box_list", translateType(["forall", ["'t"], ["->", "'t", ["exists", ["'a"], ["box", ["list", "'a"]]]]])],
+	["unbox", translateType(["forall", ["'t"], ["->", ["exists", ["'a"], ["box", "'a"]], "'t"]])]
 ]));
 
+// 测试：程序
 const a = translate(
 	["letrec",
 		["even?", ["lambda", ["x", "int"],
@@ -1127,14 +1149,16 @@ const a = translate(
 				["even?", ["-", "x", 1]]]]],
 		["id", ["lambda", "x", "x"]],
 		["id_dyn",
-			["lambda", ["x", ["forall", ["'a"], ["box", "'a"]]], ["::", ["unbox", "x"], "int"]],
-			["->", ["forall", ["'a"], ["box", "'a"]], "int"]],
+			["lambda",
+				["x", ["exists", ["'a"], ["box", "'a"]]],
+				["::", ["unbox", "x"], ["list", "int"]]],
+			["->", ["exists", ["'a"], ["box", "'a"]], ["list", "int"]]],
 		["let",
 			["strange",
 				["lambda",
 					["f", ["forall", ["'a"], ["->", "'a", "'a"]]],
 					["&", ["f", 1], ["f", ["even?", 5]]]]],
-			["&", ["strange", "id"], ["id_dyn", ["box", 1]]]]]
+			["&", ["strange", "id"], ["id_dyn", ["box_list", 1]]]]]
 );
 
 // 应当返回：`(int * boolean) * int`
