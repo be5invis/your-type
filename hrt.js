@@ -1,73 +1,10 @@
-// //// TERMS
-class Term {
-	constructor() {}
-	isAtomic() {
-		return false;
-	}
-}
-class Lit extends Term {
-	constructor(n) {
-		super();
-		this.lit = n;
-	}
-	isAtomic() {
-		return true;
-	}
-}
-class Var extends Term {
-	constructor(name) {
-		super();
-		this.name = name;
-	}
-	isAtomic() {
-		return true;
-	}
-}
-class App extends Term {
-	constructor(fn, arg) {
-		super();
-		this.fn = fn;
-		this.arg = arg;
-	}
-}
-class Lam extends Term {
-	constructor(param, body) {
-		super();
-		this.param = param;
-		this.body = body;
-	}
-}
-class ALam extends Term {
-	constructor(param, type, body) {
-		super();
-		this.param = param;
-		this.type = type;
-		this.body = body;
-	}
-}
-class Let extends Term {
-	constructor(name, bind, body) {
-		super();
-		this.name = name;
-		this.bind = bind;
-		this.body = body;
-	}
-}
-class Ann extends Term {
-	constructor(type, body) {
-		super();
-		this.type = type;
-		this.body = body;
-	}
-}
-
 // //// TYPES
 class Type {
 	constructor() {}
 
 	/**
 	 * Get all meta type variables.
-	 * @returns {Map<string, Type>}
+	 * @returns {Map<number, Type>}
 	 */
 	getMetaSlots() {
 		let a = new Map;
@@ -75,8 +12,10 @@ class Type {
 		return a;
 	}
 	_getMetaSlots(a) {}
-	// Get all free type variables.
-	// a : Set String
+	/**
+	 * Get all free slots
+	 * @returns{Set<string>}
+	 */
 	getFreeSlots() {
 		let a = new Set;
 		let bound = new Set;
@@ -84,7 +23,10 @@ class Type {
 		return a;
 	}
 	_getFreeSlots(bound, a) {}
-	// Get all binders of a type
+	/**
+	 * Get all binders of a type
+	 * @returns{Set<string>}
+	 */
 	getBinders() {
 		let a = new Set;
 		this._getBinders(a);
@@ -110,10 +52,13 @@ class Type {
 	/**
 	 * Performs deep skolemisation, retuning the skolem constants and the skolemised type
 	 * @param {Environment} env
-	 * @returns {Type}
+	 * @returns {{map: Map<string, Slot>, type: Type}}
 	 */
 	skolemise(env) {
-		return this;
+		return {
+			map: new Map(),
+			type: this
+		};
 	}
 	/**
 	 * Quantify over the specified type variables
@@ -139,6 +84,37 @@ class Type {
 	 */
 	zonk(env) {
 		return this;
+	}
+	/**
+	 * @param{Environment} env
+	 */
+	instSigma(env, exp) {
+		if (exp.check) {
+			return subsCheckRho(this, env, exp.check);
+		} else {
+			exp.infer.val = this.instantiate(env);
+		}
+	}
+	/**
+	 * @param{Environment} env
+	 * @param{Type} that
+	 */
+	subsCheck(env, that) {
+		const {map:skolTvs, rho2} = this.skolemise(env);
+		this.subsCheckRho(env, rho2);
+		const escTvs = new Set(env.getAllFreeSlots([this, that]));
+		for (let [k, v] of skolTvs) {
+			if (escTvs.has(k)) {
+				throw "Subsumption check failed"
+			}
+		}
+	}
+	/**
+	 * @param{Environment} env
+	 * @param{Type} that
+	 */
+	subsCheckRho(env, that) {
+		return unify(this, that);
 	}
 }
 
@@ -211,6 +187,13 @@ class ForAll extends Type {
 	zonk(env) {
 		return new ForAll(this.quantifiers, this.body.zonk(env));
 	}
+	/**
+	 * @param{Environment} env
+	 * @param{Type} that
+	 */
+	subsCheckRho(env, that) {
+		return this.instantiate(env).subsCheckRho(that);
+	}
 }
 class Primitive extends Type {
 	/**
@@ -276,6 +259,19 @@ class Composite extends Type {
 	}
 	zonk(env) {
 		return new Composite(this.fn.zonk(env), this.arg.zonk(env));
+	}
+	/**
+	 * @param{Environment} env
+	 * @param{Type} that
+	 */
+	subsCheckRho(env, that) {
+		if (that instanceof Composite) {
+			this.fn.subsCheck(that.fn);
+			this.arg.subsCheckRho(that.arg);
+			return true;
+		} else {
+			return unify(this, that);
+		}
 	}
 }
 class MetaSlot extends Type {
@@ -360,6 +356,28 @@ class Environment {
 		const u = this.newUnique();
 		return "." + u + "." + s;
 	}
+
+	getTypes() {
+		return this.variables.values();
+	}
+	/**
+	 * @param{IterableIterator<Type>} tys
+	 */
+	* getMetaSlotVars(tys) {
+		for (let type of tys) {
+			let type1 = type.zonk(this);
+			yield * type1.getMetaSlots();
+		}
+	}
+	/**
+	 * @param{IterableIterator<Type>} tys
+	 */
+	* getAllFreeSlots(tys) {
+		for (let type of tys) {
+			let type1 = type.zonk(this);
+			yield * type1.getFreeSlots();
+		}
+	}
 }
 
 // ////Unification
@@ -418,10 +436,234 @@ function unifyUnbound(msv, ty) {
 		}
 	}
 }
+
+function FunctionType(arg, body) {
+	return new Composite(
+		new Composite(new Primitive("->"), arg),
+		body
+	);
+}
+/**
+ * @param {Type} type
+ * @param {Environment} env
+ * @returns {[Type, Type]}
+ */
+function unifyFun(type, env) {
+	if (type instanceof Composite && type.fn instanceof Composite && type.fn.fn instanceof Primitive && type.fn.fn.name === "->") {
+		return [type.fn.arg, type.arg];
+	} else {
+		const argMsv = env.newMetaSlotVal();
+		const resMsv = env.newMetaSlotVal();
+		unify(type, FunctionType(new MetaSlot(argMsv), new MetaSlot(resMsv)));
+		return [argMsv, resMsv];
+	}
+}
 /**
  * @param {Type} t
  * @returns {boolean}
  */
 function badtype(t) {
 	return t instanceof Slot && t.name[0] !== ".";
+}
+
+
+
+
+
+// //// TERMS
+class Term {
+	constructor() {}
+	isAtomic() {
+		return false;
+	}
+	/**
+* 	 * @param {Environment} env
+	 */
+	checkRho(env, type) {
+		return this.tcRho(env, {check: type});
+	}
+	/**
+	 * @param {Environment} env
+	 * @returns {Type}
+	 */
+	inferRho(env) {
+		const ref = {val: null};
+		this.tcRho(env, {infer: ref});
+		if (!ref.val) throw "Cannot decide type"
+		return ref.val;
+	}
+	/**
+	 * @param {Environment} env
+	 * @param {{check: Type} | {infer: {val: Type}}} exp
+	 */
+	tcRho(env, exp) {}
+	/**
+	 * @param{Environment} env
+	 */
+	inferSigma(env) {
+		const expTy = this.inferRho(env);
+		const envTys = env.getTypes();
+		const envMsvs = env.getMetaSlotVars(envTys);
+		const resMsvs = new Map(env.getMetaSlotVars([expTy]));
+		for (let [id, v] of envMsvs) {
+			resMsvs.delete(id);
+		}
+		return expTy.quantify(env, Array.from(resMsvs));
+	}
+	/**
+	 * @param{Environment} env
+	 * @param{Type} sigma
+	 */
+	checkSigma(env, sigma) {
+		const {map: mvs, type: rho} = sigma.skolemise(env);
+		this.checkRho(rho);
+		const envTys = env.getTypes();
+		const escTvs = new Set(env.getAllFreeSlots(envTys));
+		for (let [name, slot] of mvs) {
+			if (escTvs.has(name)) {
+				throw "Type is not polymorphic enough"
+			}
+		}
+	}
+}
+class Lit extends Term {
+	/**
+	 * @param {number} n
+	 */
+	constructor(n) {
+		super();
+		this.lit = n;
+	}
+	isAtomic() {
+		return true;
+	}
+	tcRho(env, exp) {
+		return new Primitive("int").instSigma(env, exp);
+	}
+}
+class Var extends Term {
+	/**
+	 * @param {string} name
+	 */
+	constructor(name) {
+		super();
+		this.name = name;
+	}
+	isAtomic() {
+		return true;
+	}
+	tcRho(env, exp) {
+		const ty = env.lookup(this.name);
+		return ty.instSigma(exp);
+	}
+}
+class App extends Term {
+	/**
+	 * @param {Term} fn
+	 * @param {Term} arg
+	 */
+	constructor(fn, arg) {
+		super();
+		this.fn = fn;
+		this.arg = arg;
+	}
+	tcRho(env, exp) {
+		const funTy = this.fn.inferRho(env);
+		const [argTy, resTy] = unifyFun(funTy, env);
+		this.arg.checkRho(argTy);
+		return resTy.instSigma(env, exp);
+	}
+}
+class Lam extends Term {
+	/**
+	 * @param {string} param
+	 * @param {Term} body
+	 */
+	constructor(param, body) {
+		super();
+		this.param = param;
+		this.body = body;
+	}
+	/**
+	 * @param{Environment} env
+	 */
+	tcRho(env, exp) {
+		if (exp.check) {
+			const [varTy, bodyTy] = unifyFun(exp.check, env);
+			const env1 = env.extend(this.param, varTy);
+			return this.body.checkRho(env1, bodyTy);
+		} else {
+			const varTy = new MetaSlot(env.newMetaSlotVal());
+			const env1 = env.extend(this.name, varTy);
+			const bodyTy = this.body.inferRho(env1);
+			exp.infer.val = FunctionType(varTy, bodyTy);
+		}
+	}
+}
+class ALam extends Term {
+	/**
+	 * @param {string} param
+	 * @param {Type} type
+	 * @param {Term} body
+	 */
+	constructor(param, type, body) {
+		super();
+		this.param = param;
+		this.type = type;
+		this.body = body;
+	}
+	/**
+	 * @param{Environment} env
+	 */
+	tcRho(env, exp) {
+		if (exp.check) {
+			const [varTy, bodyTy] = unifyFun(exp.check, env);
+			varTy.subsCheck(this.type);
+			const env1 = env.extend(this.param, varTy);
+			return this.body.checkRho(env1, bodyTy);
+		} else {
+			const env1 = env.extend(this.name, this.type);
+			const bodyTy = this.body.inferRho(env1);
+			exp.infer.val = FunctionType(this.type, bodyTy);
+		}
+	}
+}
+class Let extends Term {
+	/**
+	 * @param {string} name
+	 * @param {Term} bind
+	 * @param {Term} body
+	 */
+	constructor(name, bind, body) {
+		super();
+		this.name = name;
+		this.bind = bind;
+		this.body = body;
+	}
+	/**
+	 * @param{Environment} env
+	 */
+	tcRho(env, exp) {
+		const varTy = this.bind.inferSigma(env);
+		const env1 = env.extend(this.name, varTy);
+		return this.body.tcRho(env1, exp);
+	}
+}
+class Ann extends Term {
+	/**
+	 * @param {Type} type
+	 * @param {Term} body
+	 */
+	constructor(type, body) {
+		super();
+		this.type = type;
+		this.body = body;
+	}
+	/**
+	 * @param{Environment} env
+	 */
+	tcRho(env, exp) {
+		this.body.checkSigma(this.type);
+		this.type.instSigma(env, exp);
+	}
 }
