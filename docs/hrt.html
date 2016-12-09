@@ -681,12 +681,13 @@
                 <a class="pilcrow" href="#section-29">&#182;</a>
               </div>
               <h4 id="subscheckcomposite-environment-boolean-type-type-type-type-boolean">subsCheckComposite :: Environment × boolean × Type × Type × Type × Type → boolean</h4>
-<p>复合类型的小前提检查，注意反变性</p>
+<p>复合类型的小前提检查，注意反变性。在这里我们限制任何复合类型的构造器部分是<strong>非变</strong>的，这样可以降低复杂性。对于协/反变性的更精细处理可以递归展开 f1/f2 的部分，然后分别处理每个参数。</p>
 
             </div>
             
             <div class="content"><div class='highlight'><pre><span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">subsCheckComposite</span>(<span class="hljs-params">env, contravariant, f1, f2, a1, a2</span>) </span>{
 	f1.subsCheck(env, f2);
+	f2.subsCheck(env, f1);
 	<span class="hljs-keyword">if</span> (contravariant) {
 		a2.subsCheckRho(env, a1);
 	} <span class="hljs-keyword">else</span> {

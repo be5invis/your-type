@@ -286,9 +286,10 @@ class Type {
 }
 
 // #### subsCheckComposite :: Environment × boolean × Type × Type × Type × Type → boolean
-// 复合类型的小前提检查，注意反变性
+// 复合类型的小前提检查，注意反变性。在这里我们限制任何复合类型的构造器部分是**非变**的，这样可以降低复杂性。对于协/反变性的更精细处理可以递归展开 f1/f2 的部分，然后分别处理每个参数。
 function subsCheckComposite(env, contravariant, f1, f2, a1, a2) {
 	f1.subsCheck(env, f2);
+	f2.subsCheck(env, f1);
 	if (contravariant) {
 		a2.subsCheckRho(env, a1);
 	} else {
