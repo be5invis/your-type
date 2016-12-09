@@ -277,8 +277,13 @@ class Type {
 	 */
 	subsCheckRho(env, that) {
 		if (that instanceof Composite) {
-			const [f1, a1] = unifyComposite(this, env);
-			return subsCheckComposite(env, that.contravariant, f1, that.fn, a1, that.arg);
+			if (that.fn instanceof Composite && that.fn.fn instanceof Primitive && that.fn.fn.name === "->") {
+				const [f1, a1] = unifyFun(this, env);
+				return subsCheckFunction(env, f1, that.fn.arg, a1, that.arg);
+			} else {
+				const [f1, a1] = unifyComposite(this, env);
+				return subsCheckComposite(env, that.contravariant, f1, that.fn, a1, that.arg);
+			}
 		} else {
 			return unify(this, that);
 		}
@@ -295,6 +300,12 @@ function subsCheckComposite(env, contravariant, f1, f2, a1, a2) {
 	} else {
 		a1.subsCheckRho(env, a2);
 	}
+}
+// #### subsCheckFunction :: Environment × Type × Type × Type × Type → boolean
+// 函数类型的特殊版本，对参数部分使用反变
+function subsCheckFunction(env, a1, a2, r1, r2) {
+	a2.subsCheck(env, a1); // Functions are CONTRAVARIANT to its parameter
+	r1.subsCheckRho(env, r2); // and COVARIANT to its result
 }
 
 // #### generateBinder :: ref number × Set string → string
@@ -430,8 +441,13 @@ class Composite extends Type {
 	 * @param{Type} that
 	 */
 	subsCheckRho(env, that) {
-		const [f2, a2] = unifyComposite(that, env);
-		return subsCheckComposite(env, this.contravariant, this.fn, f2, this.arg, a2);
+		if (this.fn instanceof Composite && this.fn.fn instanceof Primitive && this.fn.fn.name === "->") {
+			const [f2, a2] = unifyFun(that, env);
+			return subsCheckFunction(env, this.fn.arg, f2, this.arg, a2);
+		} else {
+			const [f2, a2] = unifyComposite(that, env);
+			return subsCheckComposite(env, this.contravariant, this.fn, f2, this.arg, a2);
+		}
 	}
 }
 
