@@ -602,6 +602,9 @@ class App extends Term {
 		return resTy.instSigma(env, exp);
 	}
 }
+/**
+ * Lambda abstraction
+ */
 class Lam extends Term {
 	/**
 	 * @param {string} param
@@ -628,6 +631,9 @@ class Lam extends Term {
 		}
 	}
 }
+/**
+ * Lambda abstraction with parameter type annotation
+ */
 class ALam extends Term {
 	/**
 	 * @param {string} param
@@ -722,14 +728,11 @@ function translate(a) {
 	} else if (a instanceof Array) {
 		if (a[0] === "let") {
 			return new Let(a[1], translate(a[2]), translate(a[3]));
-		} else if (a[0] === "a-lambda" && a.length >= 4) {
-			const ty = translateType(a[a.length - 1]);
-			const fn0 = translate(a[a.length - 2]);
-			const l = a.slice(1, -2).reduceRight((fn, term) => new Lam(term, fn), fn0);
-			return new ALam(l.param, ty, l.body);
 		} else if (a[0] === "lambda" && a.length >= 3) {
 			const fn0 = translate(a[a.length - 1]);
-			return a.slice(1, -1).reduceRight((fn, term) => new Lam(term, fn), fn0);
+			return a.slice(1, -1).reduceRight((fn, term) => (typeof term === "string")
+				? new Lam(term, fn)
+				: new ALam(term[0], translateType(term[1]), fn), fn0);
 		} else if (a[0] === "begin") {
 			return translate(a.slice(1).reduceRight((y, x) => ["seq", x, y]));
 		} else if (a.length === 2) {
@@ -754,9 +757,9 @@ const env = new Environment({val: 0}, new Map([[
 const a = translate(
 	["let", "id", ["lambda", "x", "x"],
 		["let", "f",
-			["a-lambda", "x",
-				["&", ["x", 1], ["x", null]],
-				["forall", ["'a"], ["->", "'a", "'a"]]],
+			["lambda", 
+				["x", ["forall", ["'a"], ["->", "'a", "'a"]]],
+				["&", ["x", 1], ["x", null]]],
 			["f", "id"]]]
 );
 
