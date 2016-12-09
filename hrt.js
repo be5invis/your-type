@@ -291,7 +291,7 @@ function subsCheckComposite(env, contravariant, f1, f2, a1, a2) {
 	f1.subsCheck(env, f2);
 	f2.subsCheck(env, f1);
 	if (contravariant) {
-		a2.subsCheckRho(env, a1);
+		a2.subsCheck(env, a1);
 	} else {
 		a1.subsCheckRho(env, a2);
 	}
