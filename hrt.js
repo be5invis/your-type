@@ -22,7 +22,7 @@ class Environment {
 		this.variables = variables;
 	}
 	// #### extend :: this Environment × string × Type → Environment
-	// 创建一个扩展环境 $(x:t)\Gamma$，增加一个变量
+	// 创建一个扩展环境 $\Gamma, x:t$，增加一个变量
 	/**
 	 * @param {string} name
 	 * @param {Type} type
@@ -33,7 +33,7 @@ class Environment {
 		return new Environment(this.uniqs, v1);
 	}
 	// #### extendN :: this Environment × [{name: string, type: Type}] → Environment
-	// 创建一个扩展环境 $(\overline{x:t})\Gamma$，增加一组变量。此函数用于 let rec 的构建
+	// 创建一个扩展环境 $\Gamma,\overline{x:t}$，增加一组变量。此函数用于 let rec 的构建
 	/**
 	 * @param {{name: string, type: Type}[]} terms
 	 */
@@ -230,6 +230,8 @@ class Type {
 	}
 	// #### instSigmaInfer :: this Type × Environment → Type
 	// 在类型推理时，生成一个实例化的版本
+	//
+	// INFER-INST: $\dfrac{}{\forall \overline a. \rho \le \sim [\overline{a\rightarrow\mathrm{fresh}}]\rho}$
 	/**
 	 * @param{Environment} env
 	 * @returns{Type}
@@ -254,11 +256,13 @@ class Type {
 	 * @param{Type} that
 	 */
 	subsCheck(env, that) {
-		// ${\rm subsCheck}(\sigma_1, \sigma_2)$ 成立，当且仅当：
+		// $\sigma_1 \le \sigma_2$ 成立，当且仅当：
 		const {map: skolTvs, type: rho2} = that.skolemise(env);
-		//  - ${\rm subsCheckRho}(\sigma_1, \mathrm{skolmeise}(\sigma_2).\mathrm{type}) $
+		//  - $\sigma_1 \le \rho, \forall \overline a. \rho = \mathrm{skol}(\sigma_2)$
 		this.subsCheckRho(env, rho2);
-		//  - 并且，$\sigma_1$ 的自由变量中，$\sigma_2$ 中的对应者没有被「提出来」。
+		//  - 并且，$\sigma_1$ 的自由变量中，$\sigma_2$ 中的对应者没有被「提出来」
+		//    
+		//    $\overline a \not\in \mathrm{free}(\sigma_1)$
 		const escTvs = new Set(env.getAllFreeSlots([this]));
 		for (let [k, v] of skolTvs) {
 			if (escTvs.has(rawNameOfSkolemisedName(k))) {
@@ -266,7 +270,7 @@ class Type {
 			}
 		}
 	}
-	// ${\rm subsCheckRho}(\sigma, \rho)$ 将会检查是否 $\sigma$ 比 $\rho$ 更加泛化。
+	// ${\rm subsCheckRho}(\sigma, \rho)$ 将会检查是否 $\sigma$ 比 $\rho$ 更加泛化（$\sigma\le\rho$）。
 	/**
 	 * @param{Environment} env
 	 * @param{Type} that
@@ -687,6 +691,8 @@ class Term {
 	}
 	// #### checkRho :: this Term × Environment × Type → boolean
 	// 在环境 env 中检查当前表达式是否符合 $\rho$ 类型 type
+	//
+	// $\Gamma\vdash t : \rho$
 	/**
 	 * @param {Environment} env
 	 * @param {Type} type
@@ -697,6 +703,8 @@ class Term {
 	}
 	// #### inferRho :: this Term × Environment → Type
 	// 在环境 env 中推理，尝试得到 $\rho$ 类型（或者报错）
+	//
+	// $\Gamma\vdash t :\sim \rho$
 	/**
 	 * @param {Environment} env
 	 * @returns {Type}
@@ -710,6 +718,8 @@ class Term {
 
 	// #### checkSigma :: this Term × Environment × Type → boolean
 	// 在环境 env 中检查当前表达式是否符合 $\sigma$ 类型 type
+	//
+	// CHECK-SIGMA:$\dfrac{\overline a \not\in \mathrm{free}(\Gamma)\quad \Gamma\vdash t:\rho\quad \forall\overline a.\rho = \mathrm{skol}(\sigma)}{\Gamma\vdash^* t:\sigma}$
 	/**
 	 * @param{Environment} env
 	 * @param{Type} sigma
@@ -729,6 +739,8 @@ class Term {
 
 	// #### inferSigma :: this Term × Environment → Type
 	// 在环境 env 中推理，尝试得到 $\sigma$ 类型（或者报错）
+	//
+	// INFER-SIGMA:$\dfrac{\overline a = \mathrm{free}(\rho)-\mathrm{free}(\Gamma)\quad \Gamma\vdash t:\sim \rho}{\Gamma\vdash^* t:\sim\forall\overline a.\rho}$
 	/**
 	 * @param{Environment} env
 	 * @returns{Type}
@@ -756,6 +768,7 @@ class Lit extends Term {
 	isAtomic() {
 		return true;
 	}
+	// CHECK-LIT: $\dfrac{}{\Gamma\vdash \iota:\mathrm{literalTypeOf}(\iota)}$
 	_checkRho(env, exp) {
 		if (typeof this.lit === "number") {
 			return new Primitive("int").instSigmaCheck(env, exp);
@@ -767,6 +780,7 @@ class Lit extends Term {
 			return new Primitive("unit").instSigmaCheck(env, exp);
 		}
 	}
+	// INFER-LIT: $\dfrac{}{\Gamma\vdash \iota:\sim\mathrm{literalTypeOf}(\iota)}$
 	_inferRho(env) {
 		if (typeof this.lit === "number") {
 			return new Primitive("int").instSigmaInfer(env);
@@ -791,9 +805,11 @@ class Var extends Term {
 	isAtomic() {
 		return true;
 	}
+	// CHECK-VAR: $\dfrac{\sigma\le\rho}{\Gamma, x:\sigma\vdash x:\rho}$
 	_checkRho(env, expected) {
 		return env.lookup(this.name).instSigmaCheck(env, expected);
 	}
+	// INFER-VAR: $\dfrac{\sigma\le\sim\rho}{\Gamma, x:\sigma\vdash x:\sim\rho}$
 	_inferRho(env) {
 		return env.lookup(this.name).instSigmaInfer(env);
 	}
@@ -809,12 +825,14 @@ class App extends Term {
 		this.fn = fn;
 		this.arg = arg;
 	}
+	// CHECK-APP: $\dfrac{\Gamma\vdash t:\sim(\sigma \rightarrow \sigma')\quad \Gamma\vdash^*u:\sigma\quad \sigma'\le\rho'}{\Gamma\vdash t\ u : \rho}$
 	_checkRho(env, expected) {
 		const funTy = this.fn.inferRho(env);
 		const [argTy, resTy] = unifyFun(funTy, env);
 		this.arg.checkSigma(env, argTy);
 		return resTy.instSigmaCheck(env, expected);
 	}
+	// INFER-APP: $\dfrac{\Gamma\vdash t:\sim(\sigma \rightarrow \sigma')\quad\Gamma\vdash^* u:\sigma\quad \sigma'\le\sim\rho'}{\Gamma\vdash t\ u :\sim \rho}$
 	_inferRho(env) {
 		const funTy = this.fn.inferRho(env);
 		const [argTy, resTy] = unifyFun(funTy, env);
@@ -833,6 +851,7 @@ class Lam extends Term {
 		this.param = param;
 		this.body = body;
 	}
+	// CHECK-LAM: $\dfrac{\Gamma, x:\sigma_x\vdash^* t:\sigma_t}{\Gamma\vdash(\lambda\ x.t):\sigma_x\rightarrow\sigma_t}$
 	/**
 	 * @param{Environment} env
 	 * @param{Type} expected
@@ -840,8 +859,9 @@ class Lam extends Term {
 	_checkRho(env, expected) {
 		const [varTy, bodyTy] = unifyFun(expected, env);
 		const env1 = env.extend(this.param, varTy);
-		return this.body.checkRho(env1, bodyTy);
+		return this.body.checkRho(env1, bodyTy); // bodyTy is always a Rho-type.
 	}
+	// INFER-LAM: $\dfrac{\Gamma, x:\tau\vdash t:\sim\rho}{\Gamma\vdash(\lambda\ x.t):\sim\tau\rightarrow\rho}$
 	/**
 	 * @param{Environment} env
 	 * @returns{Type} 
@@ -866,6 +886,7 @@ class ALam extends Term {
 		this.type = type;
 		this.body = body;
 	}
+	// CHECK-ALAM: $\dfrac{\sigma_a\le\sigma_x\quad\Gamma, x:\sigma_x\vdash^* t:\sigma_t}{\Gamma\vdash(\lambda(x:\sigma_x).t):\sigma_a\rightarrow\sigma_t}$
 	/**
 	 * @param{Environment} env
 	 * @param{Type} expected
@@ -876,6 +897,7 @@ class ALam extends Term {
 		const env1 = env.extend(this.param, varTy);
 		return this.body.checkRho(env1, bodyTy);
 	}
+	// INFER-ALAM: $\dfrac{\Gamma, x:\sigma\vdash t:\sim\rho}{\Gamma\vdash(\lambda(x:\sigma).t):\sim\sigma\rightarrow\rho}$
 	/**
 	 * @param{Environment} env
 	 * @returns{Type} 
@@ -898,6 +920,7 @@ class Let extends Term {
 		this.terms = terms;
 		this.body = body;
 	}
+	// CHECK-LETREC: $\dfrac{\Gamma, x:\mathrm{fresh}\vdash^* t: \sigma'\quad \Gamma, x:\sigma'\vdash u:\rho}{\Gamma\vdash(\mathbf{let\ rec}\ (x=t).u):\rho}$
 	/**
 	 * @param{Environment} env
 	 * @param{Type} expected
@@ -909,6 +932,7 @@ class Let extends Term {
 		const env2 = env.extendN(varTys);
 		return this.body.checkRho(env2, expected);
 	}
+	// INFER-LETREC: $\dfrac{\Gamma, x:\mathrm{fresh}\vdash^* t:\sim \sigma'\quad \Gamma, x:\sigma'\vdash u:\sim\rho}{\Gamma\vdash(\mathbf{let\ rec}\ (x=t).u):\sim\rho}$
 	/**
 	 * @param{Environment} env
 	 * @returns{Type} 
@@ -932,6 +956,7 @@ class Ann extends Term {
 		this.type = type;
 		this.body = body;
 	}
+	// CHECK-ANN: $\dfrac{\Gamma\vdash^* t:\sigma \quad \sigma\le\rho}{\Gamma\vdash(t:\sigma):\rho}$
 	/**
 	 * @param{Environment} env
 	 * @param{Type} expected
@@ -940,6 +965,7 @@ class Ann extends Term {
 		this.body.checkSigma(env, this.type);
 		return this.type.instSigmaCheck(env, expected);
 	}
+	// INFER-ANN: $\dfrac{\Gamma\vdash^* t:\sigma \quad \sigma\le\sim\rho}{\Gamma\vdash(t:\sigma):\sim\rho}$
 	/**
 	 * @param{Environment} env
 	 * @returns{Type} 

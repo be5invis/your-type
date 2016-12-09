@@ -81,7 +81,7 @@
                 <a class="pilcrow" href="#section-3">&#182;</a>
               </div>
               <h4 id="extend-this-environment-string-type-environment">extend :: this Environment × string × Type → Environment</h4>
-<p>创建一个扩展环境 $(x:t)\Gamma$，增加一个变量</p>
+<p>创建一个扩展环境 $\Gamma, x:t$，增加一个变量</p>
 
             </div>
             
@@ -105,7 +105,7 @@
                 <a class="pilcrow" href="#section-4">&#182;</a>
               </div>
               <h4 id="extendn-this-environment-name-string-type-type-environment">extendN :: this Environment × [{name: string, type: Type}] → Environment</h4>
-<p>创建一个扩展环境 $(\overline{x:t})\Gamma$，增加一组变量。此函数用于 let rec 的构建</p>
+<p>创建一个扩展环境 $\Gamma,\overline{x:t}$，增加一组变量。此函数用于 let rec 的构建</p>
 
             </div>
             
@@ -532,6 +532,7 @@
               </div>
               <h4 id="instsigmainfer-this-type-environment-type">instSigmaInfer :: this Type × Environment → Type</h4>
 <p>在类型推理时，生成一个实例化的版本</p>
+<p>INFER-INST: $\dfrac{}{\forall \overline a. \rho \le \sim [\overline{a\rightarrow\mathrm{fresh}}]\rho}$</p>
 
             </div>
             
@@ -595,7 +596,7 @@
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-25">&#182;</a>
               </div>
-              <p>${\rm subsCheck}(\sigma_1, \sigma_2)$ 成立，当且仅当：</p>
+              <p>$\sigma_1 \le \sigma_2$ 成立，当且仅当：</p>
 
             </div>
             
@@ -611,7 +612,7 @@
                 <a class="pilcrow" href="#section-26">&#182;</a>
               </div>
               <ul>
-<li>${\rm subsCheckRho}(\sigma_1, \mathrm{skolmeise}(\sigma_2).\mathrm{type}) $</li>
+<li>$\sigma_1 \le \rho, \forall \overline a. \rho = \mathrm{skol}(\sigma_2)$</li>
 </ul>
 
             </div>
@@ -628,7 +629,9 @@
                 <a class="pilcrow" href="#section-27">&#182;</a>
               </div>
               <ul>
-<li>并且，$\sigma_1$ 的自由变量中，$\sigma_2$ 中的对应者没有被「提出来」。</li>
+<li><p>并且，$\sigma_1$ 的自由变量中，$\sigma_2$ 中的对应者没有被「提出来」</p>
+<p>$\overline a \not\in \mathrm{free}(\sigma_1)$</p>
+</li>
 </ul>
 
             </div>
@@ -650,7 +653,7 @@
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-28">&#182;</a>
               </div>
-              <p>${\rm subsCheckRho}(\sigma, \rho)$ 将会检查是否 $\sigma$ 比 $\rho$ 更加泛化。</p>
+              <p>${\rm subsCheckRho}(\sigma, \rho)$ 将会检查是否 $\sigma$ 比 $\rho$ 更加泛化（$\sigma\le\rho$）。</p>
 
             </div>
             
@@ -1341,6 +1344,7 @@
               </div>
               <h4 id="checkrho-this-term-environment-type-boolean">checkRho :: this Term × Environment × Type → boolean</h4>
 <p>在环境 env 中检查当前表达式是否符合 $\rho$ 类型 type</p>
+<p>$\Gamma\vdash t : \rho$</p>
 
             </div>
             
@@ -1364,6 +1368,7 @@
               </div>
               <h4 id="inferrho-this-term-environment-type">inferRho :: this Term × Environment → Type</h4>
 <p>在环境 env 中推理，尝试得到 $\rho$ 类型（或者报错）</p>
+<p>$\Gamma\vdash t :\sim \rho$</p>
 
             </div>
             
@@ -1389,6 +1394,7 @@
               </div>
               <h4 id="checksigma-this-term-environment-type-boolean">checkSigma :: this Term × Environment × Type → boolean</h4>
 <p>在环境 env 中检查当前表达式是否符合 $\sigma$ 类型 type</p>
+<p>CHECK-SIGMA:$\dfrac{\overline a \not\in \mathrm{free}(\Gamma)\quad \Gamma\vdash t:\rho\quad \forall\overline a.\rho = \mathrm{skol}(\sigma)}{\Gamma\vdash^* t:\sigma}$</p>
 
             </div>
             
@@ -1420,6 +1426,7 @@
               </div>
               <h4 id="infersigma-this-term-environment-type">inferSigma :: this Term × Environment → Type</h4>
 <p>在环境 env 中推理，尝试得到 $\sigma$ 类型（或者报错）</p>
+<p>INFER-SIGMA:$\dfrac{\overline a = \mathrm{free}(\rho)-\mathrm{free}(\Gamma)\quad \Gamma\vdash t:\sim \rho}{\Gamma\vdash^* t:\sim\forall\overline a.\rho}$</p>
 
             </div>
             
@@ -1462,8 +1469,22 @@
 	}
 	isAtomic() {
 		<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>;
-	}
-	_checkRho(env, exp) {
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-55">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-55">&#182;</a>
+              </div>
+              <p>CHECK-LIT: $\dfrac{}{\Gamma\vdash \iota:\mathrm{literalTypeOf}(\iota)}$</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	_checkRho(env, exp) {
 		<span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> <span class="hljs-keyword">this</span>.lit === <span class="hljs-string">"number"</span>) {
 			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Primitive(<span class="hljs-string">"int"</span>).instSigmaCheck(env, exp);
 		} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> <span class="hljs-keyword">this</span>.lit === <span class="hljs-string">"string"</span>) {
@@ -1473,8 +1494,22 @@
 		} <span class="hljs-keyword">else</span> {
 			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Primitive(<span class="hljs-string">"unit"</span>).instSigmaCheck(env, exp);
 		}
-	}
-	_inferRho(env) {
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-56">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-56">&#182;</a>
+              </div>
+              <p>INFER-LIT: $\dfrac{}{\Gamma\vdash \iota:\sim\mathrm{literalTypeOf}(\iota)}$</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	_inferRho(env) {
 		<span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> <span class="hljs-keyword">this</span>.lit === <span class="hljs-string">"number"</span>) {
 			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Primitive(<span class="hljs-string">"int"</span>).instSigmaInfer(env);
 		} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> <span class="hljs-keyword">this</span>.lit === <span class="hljs-string">"string"</span>) {
@@ -1490,11 +1525,11 @@
         </li>
         
         
-        <li id="section-55">
+        <li id="section-57">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-55">&#182;</a>
+                <a class="pilcrow" href="#section-57">&#182;</a>
               </div>
               <h3 id="-">变量</h3>
 
@@ -1510,11 +1545,39 @@
 	}
 	isAtomic() {
 		<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>;
-	}
-	_checkRho(env, expected) {
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-58">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-58">&#182;</a>
+              </div>
+              <p>CHECK-VAR: $\dfrac{\sigma\le\rho}{\Gamma, x:\sigma\vdash x:\rho}$</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	_checkRho(env, expected) {
 		<span class="hljs-keyword">return</span> env.lookup(<span class="hljs-keyword">this</span>.name).instSigmaCheck(env, expected);
-	}
-	_inferRho(env) {
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-59">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-59">&#182;</a>
+              </div>
+              <p>INFER-VAR: $\dfrac{\sigma\le\sim\rho}{\Gamma, x:\sigma\vdash x:\sim\rho}$</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	_inferRho(env) {
 		<span class="hljs-keyword">return</span> env.lookup(<span class="hljs-keyword">this</span>.name).instSigmaInfer(env);
 	}
 }</pre></div></div>
@@ -1522,11 +1585,11 @@
         </li>
         
         
-        <li id="section-56">
+        <li id="section-60">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-56">&#182;</a>
+                <a class="pilcrow" href="#section-60">&#182;</a>
               </div>
               <h3 id="-">函数调用</h3>
 
@@ -1541,14 +1604,42 @@
 		<span class="hljs-keyword">super</span>();
 		<span class="hljs-keyword">this</span>.fn = fn;
 		<span class="hljs-keyword">this</span>.arg = arg;
-	}
-	_checkRho(env, expected) {
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-61">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-61">&#182;</a>
+              </div>
+              <p>CHECK-APP: $\dfrac{\Gamma\vdash t:\sim(\sigma \rightarrow \sigma’)\quad \Gamma\vdash^*u:\sigma\quad \sigma’\le\rho’}{\Gamma\vdash t\ u : \rho}$</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	_checkRho(env, expected) {
 		<span class="hljs-keyword">const</span> funTy = <span class="hljs-keyword">this</span>.fn.inferRho(env);
 		<span class="hljs-keyword">const</span> [argTy, resTy] = unifyFun(funTy, env);
 		<span class="hljs-keyword">this</span>.arg.checkSigma(env, argTy);
 		<span class="hljs-keyword">return</span> resTy.instSigmaCheck(env, expected);
-	}
-	_inferRho(env) {
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-62">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-62">&#182;</a>
+              </div>
+              <p>INFER-APP: $\dfrac{\Gamma\vdash t:\sim(\sigma \rightarrow \sigma’)\quad\Gamma\vdash^* u:\sigma\quad \sigma’\le\sim\rho’}{\Gamma\vdash t\ u :\sim \rho}$</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	_inferRho(env) {
 		<span class="hljs-keyword">const</span> funTy = <span class="hljs-keyword">this</span>.fn.inferRho(env);
 		<span class="hljs-keyword">const</span> [argTy, resTy] = unifyFun(funTy, env);
 		<span class="hljs-keyword">this</span>.arg.checkSigma(env, argTy);
@@ -1559,11 +1650,11 @@
         </li>
         
         
-        <li id="section-57">
+        <li id="section-63">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-57">&#182;</a>
+                <a class="pilcrow" href="#section-63">&#182;</a>
               </div>
               <h3 id="-">函数抽象</h3>
 
@@ -1578,17 +1669,45 @@
 		<span class="hljs-keyword">super</span>();
 		<span class="hljs-keyword">this</span>.param = param;
 		<span class="hljs-keyword">this</span>.body = body;
-	}
-	<span class="hljs-comment">/**
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-64">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-64">&#182;</a>
+              </div>
+              <p>CHECK-LAM: $\dfrac{\Gamma, x:\sigma_x\vdash^* t:\sigma_t}{\Gamma\vdash(\lambda\ x.t):\sigma_x\rightarrow\sigma_t}$</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-comment">/**
 	 * @param{Environment} env
 	 * @param{Type} expected
 	 */</span>
 	_checkRho(env, expected) {
 		<span class="hljs-keyword">const</span> [varTy, bodyTy] = unifyFun(expected, env);
 		<span class="hljs-keyword">const</span> env1 = env.extend(<span class="hljs-keyword">this</span>.param, varTy);
-		<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.body.checkRho(env1, bodyTy);
-	}
-	<span class="hljs-comment">/**
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.body.checkRho(env1, bodyTy); <span class="hljs-comment">// bodyTy is always a Rho-type.</span>
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-65">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-65">&#182;</a>
+              </div>
+              <p>INFER-LAM: $\dfrac{\Gamma, x:\tau\vdash t:\sim\rho}{\Gamma\vdash(\lambda\ x.t):\sim\tau\rightarrow\rho}$</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-comment">/**
 	 * @param{Environment} env
 	 * @returns{Type} 
 	 */</span>
@@ -1603,11 +1722,11 @@
         </li>
         
         
-        <li id="section-58">
+        <li id="section-66">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-58">&#182;</a>
+                <a class="pilcrow" href="#section-66">&#182;</a>
               </div>
               <h3 id="-">标记了参数类型的函数抽象</h3>
 
@@ -1624,8 +1743,22 @@
 		<span class="hljs-keyword">this</span>.param = param;
 		<span class="hljs-keyword">this</span>.type = type;
 		<span class="hljs-keyword">this</span>.body = body;
-	}
-	<span class="hljs-comment">/**
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-67">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-67">&#182;</a>
+              </div>
+              <p>CHECK-ALAM: $\dfrac{\sigma_a\le\sigma_x\quad\Gamma, x:\sigma_x\vdash^* t:\sigma_t}{\Gamma\vdash(\lambda(x:\sigma_x).t):\sigma_a\rightarrow\sigma_t}$</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-comment">/**
 	 * @param{Environment} env
 	 * @param{Type} expected
 	 */</span>
@@ -1634,8 +1767,22 @@
 		varTy.subsCheck(<span class="hljs-keyword">this</span>.type);
 		<span class="hljs-keyword">const</span> env1 = env.extend(<span class="hljs-keyword">this</span>.param, varTy);
 		<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.body.checkRho(env1, bodyTy);
-	}
-	<span class="hljs-comment">/**
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-68">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-68">&#182;</a>
+              </div>
+              <p>INFER-ALAM: $\dfrac{\Gamma, x:\sigma\vdash t:\sim\rho}{\Gamma\vdash(\lambda(x:\sigma).t):\sim\sigma\rightarrow\rho}$</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-comment">/**
 	 * @param{Environment} env
 	 * @returns{Type} 
 	 */</span>
@@ -1649,11 +1796,11 @@
         </li>
         
         
-        <li id="section-59">
+        <li id="section-69">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-59">&#182;</a>
+                <a class="pilcrow" href="#section-69">&#182;</a>
               </div>
               <h3 id="-let-">递归 Let 绑定</h3>
 
@@ -1669,8 +1816,22 @@
 		<span class="hljs-keyword">super</span>();
 		<span class="hljs-keyword">this</span>.terms = terms;
 		<span class="hljs-keyword">this</span>.body = body;
-	}
-	<span class="hljs-comment">/**
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-70">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-70">&#182;</a>
+              </div>
+              <p>CHECK-LETREC: $\dfrac{\Gamma, x:\mathrm{fresh}\vdash^* t: \sigma’\quad \Gamma, x:\sigma’\vdash u:\rho}{\Gamma\vdash(\mathbf{let\ rec}\ (x=t).u):\rho}$</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-comment">/**
 	 * @param{Environment} env
 	 * @param{Type} expected
 	 */</span>
@@ -1680,8 +1841,22 @@
 		<span class="hljs-keyword">const</span> varTys = <span class="hljs-keyword">this</span>.terms.map(<span class="hljs-function">(<span class="hljs-params">{name, bind}</span>) =&gt;</span> ({name, <span class="hljs-attr">type</span>: bind.inferSigma(env1)}));
 		<span class="hljs-keyword">const</span> env2 = env.extendN(varTys);
 		<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.body.checkRho(env2, expected);
-	}
-	<span class="hljs-comment">/**
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-71">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-71">&#182;</a>
+              </div>
+              <p>INFER-LETREC: $\dfrac{\Gamma, x:\mathrm{fresh}\vdash^* t:\sim \sigma’\quad \Gamma, x:\sigma’\vdash u:\sim\rho}{\Gamma\vdash(\mathbf{let\ rec}\ (x=t).u):\sim\rho}$</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-comment">/**
 	 * @param{Environment} env
 	 * @returns{Type} 
 	 */</span>
@@ -1697,11 +1872,11 @@
         </li>
         
         
-        <li id="section-60">
+        <li id="section-72">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-60">&#182;</a>
+                <a class="pilcrow" href="#section-72">&#182;</a>
               </div>
               <h3 id="-">显式窄化</h3>
 
@@ -1716,16 +1891,44 @@
 		<span class="hljs-keyword">super</span>();
 		<span class="hljs-keyword">this</span>.type = type;
 		<span class="hljs-keyword">this</span>.body = body;
-	}
-	<span class="hljs-comment">/**
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-73">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-73">&#182;</a>
+              </div>
+              <p>CHECK-ANN: $\dfrac{\Gamma\vdash^* t:\sigma \quad \sigma\le\rho}{\Gamma\vdash(t:\sigma):\rho}$</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-comment">/**
 	 * @param{Environment} env
 	 * @param{Type} expected
 	 */</span>
 	_checkRho(env, expected) {
 		<span class="hljs-keyword">this</span>.body.checkSigma(env, <span class="hljs-keyword">this</span>.type);
 		<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.type.instSigmaCheck(env, expected);
-	}
-	<span class="hljs-comment">/**
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-74">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-74">&#182;</a>
+              </div>
+              <p>INFER-ANN: $\dfrac{\Gamma\vdash^* t:\sigma \quad \sigma\le\sim\rho}{\Gamma\vdash(t:\sigma):\sim\rho}$</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-comment">/**
 	 * @param{Environment} env
 	 * @returns{Type} 
 	 */</span>
@@ -1738,11 +1941,11 @@
         </li>
         
         
-        <li id="section-61">
+        <li id="section-75">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-61">&#182;</a>
+                <a class="pilcrow" href="#section-75">&#182;</a>
               </div>
               <h2 id="-">测试部分</h2>
 
@@ -1845,11 +2048,11 @@
         </li>
         
         
-        <li id="section-62">
+        <li id="section-76">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-62">&#182;</a>
+                <a class="pilcrow" href="#section-76">&#182;</a>
               </div>
               <p>应当返回：<code>(int * boolean) * int</code></p>
 
