@@ -932,7 +932,7 @@ class Let extends Term {
 		this.terms = terms;
 		this.body = body;
 	}
-	// CHECK-LETREC: $\dfrac{\Gamma\vdash^* t: \sigma'\quad \Gamma, x:\sigma'\vdash u:\rho}{\Gamma\vdash(\mathbf{let}\ (x=t).u):\rho}$
+	// CHECK-LET: $\dfrac{\Gamma\vdash^* t: \sigma'\quad \Gamma, x:\sigma'\vdash u:\rho}{\Gamma\vdash(\mathbf{let}\ (x=t).u):\rho}$
 	/**
 	 * @param{Environment} env
 	 * @param{Type} expected
@@ -942,7 +942,7 @@ class Let extends Term {
 		const env1 = env.extendN(varTys);
 		return this.body.checkRho(env1, expected);
 	}
-	// INFER-LETREC: $\dfrac{\Gamma\vdash^* t:\sim \sigma'\quad \Gamma, x:\sigma'\vdash u:\sim\rho}{\Gamma\vdash(\mathbf{let}\ (x=t).u):\sim\rho}$
+	// INFER-LET: $\dfrac{\Gamma\vdash^* t:\sim \sigma'\quad \Gamma, x:\sigma'\vdash u:\sim\rho}{\Gamma\vdash(\mathbf{let}\ (x=t).u):\sim\rho}$
 	/**
 	 * @param{Environment} env
 	 * @returns{Type} 
