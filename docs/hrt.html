@@ -663,13 +663,8 @@
 	 */</span>
 	subsCheckRho(env, that) {
 		<span class="hljs-keyword">if</span> (that <span class="hljs-keyword">instanceof</span> Composite) {
-			<span class="hljs-keyword">if</span> (that.fn <span class="hljs-keyword">instanceof</span> Composite &amp;&amp; that.fn.fn <span class="hljs-keyword">instanceof</span> Primitive &amp;&amp; that.fn.fn.name === <span class="hljs-string">"-&gt;"</span>) {
-				<span class="hljs-keyword">const</span> [f1, a1] = unifyFun(<span class="hljs-keyword">this</span>, env);
-				<span class="hljs-keyword">return</span> subsCheckFunction(env, f1, that.fn.arg, a1, that.arg);
-			} <span class="hljs-keyword">else</span> {
-				<span class="hljs-keyword">const</span> [f1, a1] = unifyComposite(<span class="hljs-keyword">this</span>, env);
-				<span class="hljs-keyword">return</span> subsCheckComposite(env, that.contravariant, f1, that.fn, a1, that.arg);
-			}
+			<span class="hljs-keyword">const</span> [f1, a1] = unifyComposite(<span class="hljs-keyword">this</span>, env);
+			<span class="hljs-keyword">return</span> subsCheckComposite(env, that.contravariant, f1, that.fn, a1, that.arg);
 		} <span class="hljs-keyword">else</span> {
 			<span class="hljs-keyword">return</span> unify(<span class="hljs-keyword">this</span>, that);
 		}
@@ -692,7 +687,6 @@
             
             <div class="content"><div class='highlight'><pre><span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">subsCheckComposite</span>(<span class="hljs-params">env, contravariant, f1, f2, a1, a2</span>) </span>{
 	f1.subsCheck(env, f2);
-	f2.subsCheck(env, f1);
 	<span class="hljs-keyword">if</span> (contravariant) {
 		a2.subsCheck(env, a1);
 	} <span class="hljs-keyword">else</span> {
@@ -708,25 +702,6 @@
               
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-30">&#182;</a>
-              </div>
-              <h4 id="subscheckfunction-environment-type-type-type-type-boolean">subsCheckFunction :: Environment × Type × Type × Type × Type → boolean</h4>
-<p>函数类型的特殊版本，对参数部分使用反变</p>
-
-            </div>
-            
-            <div class="content"><div class='highlight'><pre><span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">subsCheckFunction</span>(<span class="hljs-params">env, a1, a2, r1, r2</span>) </span>{
-	a2.subsCheck(env, a1); <span class="hljs-comment">// Functions are CONTRAVARIANT to its parameter</span>
-	r1.subsCheckRho(env, r2); <span class="hljs-comment">// and COVARIANT to its result</span>
-}</pre></div></div>
-            
-        </li>
-        
-        
-        <li id="section-31">
-            <div class="annotation">
-              
-              <div class="pilwrap ">
-                <a class="pilcrow" href="#section-31">&#182;</a>
               </div>
               <h4 id="generatebinder-ref-number-set-string-string">generateBinder :: ref number × Set string → string</h4>
 <p>获取新的名字，用于泛化过程中的重命名</p>
@@ -746,11 +721,11 @@
         </li>
         
         
-        <li id="section-32">
+        <li id="section-31">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-32">&#182;</a>
+                <a class="pilcrow" href="#section-31">&#182;</a>
               </div>
               <h3 id="-">基本类型</h3>
 
@@ -772,11 +747,11 @@
         </li>
         
         
-        <li id="section-33">
+        <li id="section-32">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-33">&#182;</a>
+                <a class="pilcrow" href="#section-32">&#182;</a>
               </div>
               <h3 id="-a-">限制的类型变量，$a$</h3>
 <p>Slot 可能有两种来源：</p>
@@ -828,11 +803,11 @@
         </li>
         
         
-        <li id="section-34">
+        <li id="section-33">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-34">&#182;</a>
+                <a class="pilcrow" href="#section-33">&#182;</a>
               </div>
               <h3 id="-sigma_1-sigma_2-">复合类型，$\sigma_1 \sigma_2$</h3>
 
@@ -843,11 +818,11 @@
         </li>
         
         
-        <li id="section-35">
+        <li id="section-34">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-35">&#182;</a>
+                <a class="pilcrow" href="#section-34">&#182;</a>
               </div>
               <p>复合类型由三个部分构成：</p>
 <ul>
@@ -905,22 +880,34 @@
         </li>
         
         
-        <li id="section-36">
+        <li id="section-35">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-36">&#182;</a>
+                <a class="pilcrow" href="#section-35">&#182;</a>
               </div>
-              <p>复合类型的斯科伦化不会向内继续展开</p>
+              <p>复合类型的斯科伦化不会向反变分支内继续展开</p>
 
             </div>
             
             <div class="content"><div class='highlight'><pre>	skolmeize(env) {
-		<span class="hljs-keyword">let</span> {<span class="hljs-attr">map</span>: m1, <span class="hljs-attr">type</span>: t1} = <span class="hljs-keyword">this</span>.arg.skolmeize(env);
-		<span class="hljs-keyword">return</span> {
-			<span class="hljs-attr">map</span>: m1,
-			<span class="hljs-attr">type</span>: <span class="hljs-keyword">new</span> Composite(<span class="hljs-keyword">this</span>.fn, t1, <span class="hljs-keyword">this</span>.contravariant)
-		};
+		<span class="hljs-keyword">let</span> {<span class="hljs-attr">map</span>: m1, <span class="hljs-attr">type</span>: t1} = <span class="hljs-keyword">this</span>.fn.skolmeize(env);
+		<span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.contravariant) {
+			<span class="hljs-keyword">let</span> {<span class="hljs-attr">map</span>: m2, <span class="hljs-attr">type</span>: t2} = <span class="hljs-keyword">this</span>.arg.skolmeize(env);
+			<span class="hljs-keyword">return</span> {
+				<span class="hljs-attr">map</span>: m1,
+				<span class="hljs-attr">type</span>: <span class="hljs-keyword">new</span> Composite(t1, <span class="hljs-keyword">this</span>.arg, <span class="hljs-keyword">this</span>.contravariant)
+			};
+		} <span class="hljs-keyword">else</span> {
+			<span class="hljs-keyword">let</span> {<span class="hljs-attr">map</span>: m2, <span class="hljs-attr">type</span>: t2} = <span class="hljs-keyword">this</span>.arg.skolmeize(env);
+			<span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> [k, v] <span class="hljs-keyword">of</span> m1.entries()) {
+				m2.set(k, v);
+			}
+			<span class="hljs-keyword">return</span> {
+				<span class="hljs-attr">map</span>: m2,
+				<span class="hljs-attr">type</span>: <span class="hljs-keyword">new</span> Composite(t1, t2, <span class="hljs-keyword">this</span>.contravariant)
+			};
+		}
 	}
 	zonk(env) {
 		<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Composite(<span class="hljs-keyword">this</span>.fn.zonk(env), <span class="hljs-keyword">this</span>.arg.zonk(env), <span class="hljs-keyword">this</span>.contravariant);
@@ -930,24 +917,19 @@
 	 * @param{Type} that
 	 */</span>
 	subsCheckRho(env, that) {
-		<span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.fn <span class="hljs-keyword">instanceof</span> Composite &amp;&amp; <span class="hljs-keyword">this</span>.fn.fn <span class="hljs-keyword">instanceof</span> Primitive &amp;&amp; <span class="hljs-keyword">this</span>.fn.fn.name === <span class="hljs-string">"-&gt;"</span>) {
-			<span class="hljs-keyword">const</span> [f2, a2] = unifyFun(that, env);
-			<span class="hljs-keyword">return</span> subsCheckFunction(env, <span class="hljs-keyword">this</span>.fn.arg, f2, <span class="hljs-keyword">this</span>.arg, a2);
-		} <span class="hljs-keyword">else</span> {
-			<span class="hljs-keyword">const</span> [f2, a2] = unifyComposite(that, env);
-			<span class="hljs-keyword">return</span> subsCheckComposite(env, <span class="hljs-keyword">this</span>.contravariant, <span class="hljs-keyword">this</span>.fn, f2, <span class="hljs-keyword">this</span>.arg, a2);
-		}
+		<span class="hljs-keyword">const</span> [f2, a2] = unifyComposite(that, env);
+		<span class="hljs-keyword">return</span> subsCheckComposite(env, <span class="hljs-keyword">this</span>.contravariant, <span class="hljs-keyword">this</span>.fn, f2, <span class="hljs-keyword">this</span>.arg, a2);
 	}
 }</pre></div></div>
             
         </li>
         
         
-        <li id="section-37">
+        <li id="section-36">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-37">&#182;</a>
+                <a class="pilcrow" href="#section-36">&#182;</a>
               </div>
               <h3 id="-forall-overline-a-rho-">多态类型，$\forall \overline a. \rho$</h3>
 
@@ -990,11 +972,11 @@
         </li>
         
         
-        <li id="section-38">
+        <li id="section-37">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-38">&#182;</a>
+                <a class="pilcrow" href="#section-37">&#182;</a>
               </div>
               <p>多态类型进行替换的时候，需要从映射 m 中删掉其量化子 $\overline a$ 包含的项目。</p>
 
@@ -1011,11 +993,11 @@
         </li>
         
         
-        <li id="section-39">
+        <li id="section-38">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-39">&#182;</a>
+                <a class="pilcrow" href="#section-38">&#182;</a>
               </div>
               <p>实例化时，创建一个量化子 $\overline a$ 到「新变量」的映射，然后返回其内容经过替换时的结果。</p>
 
@@ -1032,11 +1014,11 @@
         </li>
         
         
-        <li id="section-40">
+        <li id="section-39">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-40">&#182;</a>
+                <a class="pilcrow" href="#section-39">&#182;</a>
               </div>
               <p>多态类型的深斯科伦化会合并内外两层的变量表。</p>
 
@@ -1079,11 +1061,11 @@
         </li>
         
         
-        <li id="section-41">
+        <li id="section-40">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-41">&#182;</a>
+                <a class="pilcrow" href="#section-40">&#182;</a>
               </div>
               <h3 id="meta-slot-">Meta Slot，推理过程中的未决议类型</h3>
 
@@ -1119,11 +1101,11 @@
         </li>
         
         
-        <li id="section-42">
+        <li id="section-41">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-42">&#182;</a>
+                <a class="pilcrow" href="#section-41">&#182;</a>
               </div>
               <h3 id="metaslotval-metaslot-">MetaSlotVal: MetaSlot 的值</h3>
 <p>MetaSlotVal 包含两个字段，编号 id 和 typeRef，一个对类型的引用。两个 MetaSlotVal 的 id 相同即视为相等。</p>
@@ -1147,11 +1129,11 @@
         </li>
         
         
-        <li id="section-43">
+        <li id="section-42">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-43">&#182;</a>
+                <a class="pilcrow" href="#section-42">&#182;</a>
               </div>
               <h2 id="-">第三部分，合一</h2>
 
@@ -1160,11 +1142,11 @@
         </li>
         
         
-        <li id="section-44">
+        <li id="section-43">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-44">&#182;</a>
+                <a class="pilcrow" href="#section-43">&#182;</a>
               </div>
               <h3 id="unify-type-type-boolean">unify :: type × type → boolean</h3>
 <p>尝试合一两个类型，成功返回 true，否则报错。</p>
@@ -1201,11 +1183,11 @@
         </li>
         
         
-        <li id="section-45">
+        <li id="section-44">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-45">&#182;</a>
+                <a class="pilcrow" href="#section-44">&#182;</a>
               </div>
               <h3 id="unifymetaslot-metaslotval-type-boolean">unifyMetaSlot :: MetaSlotVal × Type → boolean</h3>
 <p>Meta slot 的合一，一般情况</p>
@@ -1227,11 +1209,11 @@
         </li>
         
         
-        <li id="section-46">
+        <li id="section-45">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-46">&#182;</a>
+                <a class="pilcrow" href="#section-45">&#182;</a>
               </div>
               <h3 id="unifyunbound-metaslotval-type-boolean">unifyUnbound :: MetaSlotVal × Type → boolean</h3>
 <p>Meta slot 的合一，未绑定情况</p>
@@ -1265,11 +1247,11 @@
         </li>
         
         
-        <li id="section-47">
+        <li id="section-46">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-47">&#182;</a>
+                <a class="pilcrow" href="#section-46">&#182;</a>
               </div>
               <h3 id="unifyfun-type-environment-boolean">unifyFun :: Type × Environment → boolean</h3>
 <p>合一类型到函数</p>
@@ -1298,11 +1280,11 @@
         </li>
         
         
-        <li id="section-48">
+        <li id="section-47">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-48">&#182;</a>
+                <a class="pilcrow" href="#section-47">&#182;</a>
               </div>
               <h3 id="functiontype-type-type-type">FunctionType :: Type × Type → Type</h3>
 <p>构造一个函数类型</p>
@@ -1316,11 +1298,11 @@
         </li>
         
         
-        <li id="section-49">
+        <li id="section-48">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-49">&#182;</a>
+                <a class="pilcrow" href="#section-48">&#182;</a>
               </div>
               <h3 id="unifycomposite-type-environment-boolean">unifyComposite :: Type × Environment → boolean</h3>
 <p>合一类型到任意复合类型</p>
@@ -1346,11 +1328,11 @@
         </li>
         
         
-        <li id="section-50">
+        <li id="section-49">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-50">&#182;</a>
+                <a class="pilcrow" href="#section-49">&#182;</a>
               </div>
               <h2 id="-">第四部分，主推理算法</h2>
 <p>由于高阶类型的介入，Damas-Hindley-Milner 系统中的单一「推理」方法需要拆分为一对方法，<code>infer</code> 和 <code>check</code>；它们会再根据所处理的类型（$\sigma$ 或者 $\rho$ 类型），再各自进行拆分，因此最终得到四个方法：<code>inferRho</code>, <code>checkRho</code>, <code>inferSigma</code>, <code>checkSigma</code>。</p>
@@ -1366,11 +1348,11 @@
         </li>
         
         
-        <li id="section-51">
+        <li id="section-50">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-51">&#182;</a>
+                <a class="pilcrow" href="#section-50">&#182;</a>
               </div>
               <h4 id="checkrho-this-term-environment-type-boolean">checkRho :: <em>this</em> Term × Environment × Type → boolean</h4>
 <p>在环境 env 中检查当前表达式是否符合 $\rho$ 类型 type</p>
@@ -1390,11 +1372,11 @@
         </li>
         
         
-        <li id="section-52">
+        <li id="section-51">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-52">&#182;</a>
+                <a class="pilcrow" href="#section-51">&#182;</a>
               </div>
               <h4 id="inferrho-this-term-environment-type">inferRho :: <em>this</em> Term × Environment → Type</h4>
 <p>在环境 env 中推理，尝试得到 $\rho$ 类型（或者报错）</p>
@@ -1416,11 +1398,11 @@
         </li>
         
         
-        <li id="section-53">
+        <li id="section-52">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-53">&#182;</a>
+                <a class="pilcrow" href="#section-52">&#182;</a>
               </div>
               <h4 id="checksigma-this-term-environment-type-boolean">checkSigma :: <em>this</em> Term × Environment × Type → boolean</h4>
 <p>在环境 env 中检查当前表达式是否符合 $\sigma$ 类型 type</p>
@@ -1448,11 +1430,11 @@
         </li>
         
         
-        <li id="section-54">
+        <li id="section-53">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-54">&#182;</a>
+                <a class="pilcrow" href="#section-53">&#182;</a>
               </div>
               <h4 id="infersigma-this-term-environment-type">inferSigma :: <em>this</em> Term × Environment → Type</h4>
 <p>在环境 env 中推理，尝试得到 $\sigma$ 类型（或者报错）</p>
@@ -1479,11 +1461,11 @@
         </li>
         
         
-        <li id="section-55">
+        <li id="section-54">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-55">&#182;</a>
+                <a class="pilcrow" href="#section-54">&#182;</a>
               </div>
               <h3 id="-">直接量</h3>
 
@@ -1504,11 +1486,11 @@
         </li>
         
         
-        <li id="section-56">
+        <li id="section-55">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-56">&#182;</a>
+                <a class="pilcrow" href="#section-55">&#182;</a>
               </div>
               <p>CHECK-LIT: $\dfrac{}{\Gamma\vdash \iota:\mathrm{literalTypeOf}(\iota)}$</p>
 
@@ -1529,11 +1511,11 @@
         </li>
         
         
-        <li id="section-57">
+        <li id="section-56">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-57">&#182;</a>
+                <a class="pilcrow" href="#section-56">&#182;</a>
               </div>
               <p>INFER-LIT: $\dfrac{}{\Gamma\vdash \iota:\sim\mathrm{literalTypeOf}(\iota)}$</p>
 
@@ -1555,11 +1537,11 @@
         </li>
         
         
-        <li id="section-58">
+        <li id="section-57">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-58">&#182;</a>
+                <a class="pilcrow" href="#section-57">&#182;</a>
               </div>
               <h3 id="-">变量</h3>
 
@@ -1580,11 +1562,11 @@
         </li>
         
         
-        <li id="section-59">
+        <li id="section-58">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-59">&#182;</a>
+                <a class="pilcrow" href="#section-58">&#182;</a>
               </div>
               <p>CHECK-VAR: $\dfrac{\sigma\le\rho}{\Gamma, x:\sigma\vdash x:\rho}$</p>
 
@@ -1597,11 +1579,11 @@
         </li>
         
         
-        <li id="section-60">
+        <li id="section-59">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-60">&#182;</a>
+                <a class="pilcrow" href="#section-59">&#182;</a>
               </div>
               <p>INFER-VAR: $\dfrac{\sigma\le\sim\rho}{\Gamma, x:\sigma\vdash x:\sim\rho}$</p>
 
@@ -1615,11 +1597,11 @@
         </li>
         
         
-        <li id="section-61">
+        <li id="section-60">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-61">&#182;</a>
+                <a class="pilcrow" href="#section-60">&#182;</a>
               </div>
               <h3 id="-">函数调用</h3>
 
@@ -1639,11 +1621,11 @@
         </li>
         
         
-        <li id="section-62">
+        <li id="section-61">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-62">&#182;</a>
+                <a class="pilcrow" href="#section-61">&#182;</a>
               </div>
               <p>CHECK-APP: $\dfrac{\Gamma\vdash t:\sim(\sigma \rightarrow \sigma’)\quad \Gamma\vdash^*u:\sigma\quad \sigma’\le\rho’}{\Gamma\vdash t\ u : \rho}$</p>
 
@@ -1659,11 +1641,11 @@
         </li>
         
         
-        <li id="section-63">
+        <li id="section-62">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-63">&#182;</a>
+                <a class="pilcrow" href="#section-62">&#182;</a>
               </div>
               <p>INFER-APP: $\dfrac{\Gamma\vdash t:\sim(\sigma \rightarrow \sigma’)\quad\Gamma\vdash^* u:\sigma\quad \sigma’\le\sim\rho’}{\Gamma\vdash t\ u :\sim \rho}$</p>
 
@@ -1680,11 +1662,11 @@
         </li>
         
         
-        <li id="section-64">
+        <li id="section-63">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-64">&#182;</a>
+                <a class="pilcrow" href="#section-63">&#182;</a>
               </div>
               <h3 id="-">函数抽象</h3>
 
@@ -1704,11 +1686,11 @@
         </li>
         
         
-        <li id="section-65">
+        <li id="section-64">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-65">&#182;</a>
+                <a class="pilcrow" href="#section-64">&#182;</a>
               </div>
               <p>CHECK-LAM: $\dfrac{\Gamma, x:\sigma_x\vdash^* t:\sigma_t}{\Gamma\vdash(\lambda\ x.t):\sigma_x\rightarrow\sigma_t}$</p>
 
@@ -1727,11 +1709,11 @@
         </li>
         
         
-        <li id="section-66">
+        <li id="section-65">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-66">&#182;</a>
+                <a class="pilcrow" href="#section-65">&#182;</a>
               </div>
               <p>INFER-LAM: $\dfrac{\Gamma, x:\tau\vdash t:\sim\rho}{\Gamma\vdash(\lambda\ x.t):\sim\tau\rightarrow\rho}$</p>
 
@@ -1752,11 +1734,11 @@
         </li>
         
         
-        <li id="section-67">
+        <li id="section-66">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-67">&#182;</a>
+                <a class="pilcrow" href="#section-66">&#182;</a>
               </div>
               <h3 id="-">标记了参数类型的函数抽象</h3>
 
@@ -1778,11 +1760,11 @@
         </li>
         
         
-        <li id="section-68">
+        <li id="section-67">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-68">&#182;</a>
+                <a class="pilcrow" href="#section-67">&#182;</a>
               </div>
               <p>CHECK-ALAM: $\dfrac{\sigma_a\le\sigma_x\quad\Gamma, x:\sigma_x\vdash^* t:\sigma_t}{\Gamma\vdash(\lambda(x:\sigma_x).t):\sigma_a\rightarrow\sigma_t}$</p>
 
@@ -1802,11 +1784,11 @@
         </li>
         
         
-        <li id="section-69">
+        <li id="section-68">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-69">&#182;</a>
+                <a class="pilcrow" href="#section-68">&#182;</a>
               </div>
               <p>INFER-ALAM: $\dfrac{\Gamma, x:\sigma\vdash t:\sim\rho}{\Gamma\vdash(\lambda(x:\sigma).t):\sim\sigma\rightarrow\rho}$</p>
 
@@ -1826,11 +1808,11 @@
         </li>
         
         
-        <li id="section-70">
+        <li id="section-69">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-70">&#182;</a>
+                <a class="pilcrow" href="#section-69">&#182;</a>
               </div>
               <h3 id="-let-">递归 Let 绑定</h3>
 
@@ -1851,11 +1833,11 @@
         </li>
         
         
-        <li id="section-71">
+        <li id="section-70">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-71">&#182;</a>
+                <a class="pilcrow" href="#section-70">&#182;</a>
               </div>
               <p>CHECK-LETREC: $\dfrac{\Gamma, x:\mathrm{fresh}\vdash^* t: \sigma’\quad \Gamma, x:\sigma’\vdash u:\rho}{\Gamma\vdash(\mathbf{let\ rec}\ (x=t).u):\rho}$</p>
 
@@ -1876,11 +1858,11 @@
         </li>
         
         
-        <li id="section-72">
+        <li id="section-71">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-72">&#182;</a>
+                <a class="pilcrow" href="#section-71">&#182;</a>
               </div>
               <p>INFER-LETREC: $\dfrac{\Gamma, x:\mathrm{fresh}\vdash^* t:\sim \sigma’\quad \Gamma, x:\sigma’\vdash u:\sim\rho}{\Gamma\vdash(\mathbf{let\ rec}\ (x=t).u):\sim\rho}$</p>
 
@@ -1902,11 +1884,11 @@
         </li>
         
         
-        <li id="section-73">
+        <li id="section-72">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-73">&#182;</a>
+                <a class="pilcrow" href="#section-72">&#182;</a>
               </div>
               <h3 id="-">显式窄化</h3>
 
@@ -1926,11 +1908,11 @@
         </li>
         
         
-        <li id="section-74">
+        <li id="section-73">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-74">&#182;</a>
+                <a class="pilcrow" href="#section-73">&#182;</a>
               </div>
               <p>CHECK-ANN: $\dfrac{\Gamma\vdash^* t:\sigma \quad \sigma\le\rho}{\Gamma\vdash(t:\sigma):\rho}$</p>
 
@@ -1948,11 +1930,11 @@
         </li>
         
         
-        <li id="section-75">
+        <li id="section-74">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-75">&#182;</a>
+                <a class="pilcrow" href="#section-74">&#182;</a>
               </div>
               <p>INFER-ANN: $\dfrac{\Gamma\vdash^* t:\sigma \quad \sigma\le\sim\rho}{\Gamma\vdash(t:\sigma):\sim\rho}$</p>
 
@@ -1971,11 +1953,11 @@
         </li>
         
         
-        <li id="section-76">
+        <li id="section-75">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-76">&#182;</a>
+                <a class="pilcrow" href="#section-75">&#182;</a>
               </div>
               <h2 id="-">测试部分</h2>
 
@@ -2078,11 +2060,11 @@
         </li>
         
         
-        <li id="section-77">
+        <li id="section-76">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-77">&#182;</a>
+                <a class="pilcrow" href="#section-76">&#182;</a>
               </div>
               <p>应当返回：<code>(int * boolean) * int</code></p>
 

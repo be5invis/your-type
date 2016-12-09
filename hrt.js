@@ -277,13 +277,8 @@ class Type {
 	 */
 	subsCheckRho(env, that) {
 		if (that instanceof Composite) {
-			if (that.fn instanceof Composite && that.fn.fn instanceof Primitive && that.fn.fn.name === "->") {
-				const [f1, a1] = unifyFun(this, env);
-				return subsCheckFunction(env, f1, that.fn.arg, a1, that.arg);
-			} else {
-				const [f1, a1] = unifyComposite(this, env);
-				return subsCheckComposite(env, that.contravariant, f1, that.fn, a1, that.arg);
-			}
+			const [f1, a1] = unifyComposite(this, env);
+			return subsCheckComposite(env, that.contravariant, f1, that.fn, a1, that.arg);
 		} else {
 			return unify(this, that);
 		}
@@ -294,18 +289,11 @@ class Type {
 // 复合类型的小前提检查，注意反变性。在这里我们限制任何复合类型的构造器部分是**非变**的，这样可以降低复杂性。对于协/反变性的更精细处理可以递归展开 f1/f2 的部分，然后分别处理每个参数。
 function subsCheckComposite(env, contravariant, f1, f2, a1, a2) {
 	f1.subsCheck(env, f2);
-	f2.subsCheck(env, f1);
 	if (contravariant) {
 		a2.subsCheck(env, a1);
 	} else {
 		a1.subsCheckRho(env, a2);
 	}
-}
-// #### subsCheckFunction :: Environment × Type × Type × Type × Type → boolean
-// 函数类型的特殊版本，对参数部分使用反变
-function subsCheckFunction(env, a1, a2, r1, r2) {
-	a2.subsCheck(env, a1); // Functions are CONTRAVARIANT to its parameter
-	r1.subsCheckRho(env, r2); // and COVARIANT to its result
 }
 
 // #### generateBinder :: ref number × Set string → string
@@ -425,13 +413,25 @@ class Composite extends Type {
 	subst(m) {
 		return new Composite(this.fn.subst(m), this.arg.subst(m), this.contravariant);
 	}
-	// 复合类型的斯科伦化不会向内继续展开
+	// 复合类型的斯科伦化不会向反变分支内继续展开
 	skolmeize(env) {
-		let {map: m1, type: t1} = this.arg.skolmeize(env);
-		return {
-			map: m1,
-			type: new Composite(this.fn, t1, this.contravariant)
-		};
+		let {map: m1, type: t1} = this.fn.skolmeize(env);
+		if (this.contravariant) {
+			let {map: m2, type: t2} = this.arg.skolmeize(env);
+			return {
+				map: m1,
+				type: new Composite(t1, this.arg, this.contravariant)
+			};
+		} else {
+			let {map: m2, type: t2} = this.arg.skolmeize(env);
+			for (let [k, v] of m1.entries()) {
+				m2.set(k, v);
+			}
+			return {
+				map: m2,
+				type: new Composite(t1, t2, this.contravariant)
+			};
+		}
 	}
 	zonk(env) {
 		return new Composite(this.fn.zonk(env), this.arg.zonk(env), this.contravariant);
@@ -441,13 +441,8 @@ class Composite extends Type {
 	 * @param{Type} that
 	 */
 	subsCheckRho(env, that) {
-		if (this.fn instanceof Composite && this.fn.fn instanceof Primitive && this.fn.fn.name === "->") {
-			const [f2, a2] = unifyFun(that, env);
-			return subsCheckFunction(env, this.fn.arg, f2, this.arg, a2);
-		} else {
-			const [f2, a2] = unifyComposite(that, env);
-			return subsCheckComposite(env, this.contravariant, this.fn, f2, this.arg, a2);
-		}
+		const [f2, a2] = unifyComposite(that, env);
+		return subsCheckComposite(env, this.contravariant, this.fn, f2, this.arg, a2);
 	}
 }
 
