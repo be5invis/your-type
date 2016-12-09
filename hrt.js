@@ -702,7 +702,9 @@ class Ann extends Term {
 	}
 }
 
-
+/**
+ * @returns{Type}
+ */
 function translateType(a) {
 	if (a instanceof Array) {
 		if (a[0] === "forall") {
@@ -722,6 +724,9 @@ function translateType(a) {
 	}
 }
 
+/**
+ * @returns{Term}
+ */
 function translate(a) {
 	if (!a) {
 		return new Lit(a);
