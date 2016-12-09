@@ -413,16 +413,17 @@ class Composite extends Type {
 	subst(m) {
 		return new Composite(this.fn.subst(m), this.arg.subst(m), this.contravariant);
 	}
-	// 复合类型的斯科伦化不会向反变分支内继续展开
+	// 复合类型的斯科伦化需要小心地处理其参数部分：
 	skolmeize(env) {
 		let {map: m1, type: t1} = this.fn.skolmeize(env);
 		if (this.contravariant) {
-			let {map: m2, type: t2} = this.arg.skolmeize(env);
+			//   - 如果这个类型是反变的，保留其 arg 部分；
 			return {
 				map: m1,
 				type: new Composite(t1, this.arg, this.contravariant)
 			};
 		} else {
+			//   - 如果这个类型是协变的，展开其 arg 部分。
 			let {map: m2, type: t2} = this.arg.skolmeize(env);
 			for (let [k, v] of m1.entries()) {
 				m2.set(k, v);
