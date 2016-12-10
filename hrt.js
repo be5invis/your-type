@@ -1410,6 +1410,9 @@ class Inst extends Term {
 	}
 }
 // ### System-F 的约制子特殊形式
+// $\mathrm{ctor}\ \theta\ x$：让约制子 $\theta$ 检查复合类型对象 $x$ 类型的构造器部分
+//
+// $\mathrm{arg}\ \theta\ x$：让约制子 $\theta$ 检查复合类型对象 $x$ 类型的参数部分
 class CtorCoercion extends Term {
 	constructor() {
 		super();
