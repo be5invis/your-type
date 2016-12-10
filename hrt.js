@@ -320,7 +320,11 @@ function subsCheckComposite(env, contravariant, f1, f2, a1, a2) {
 		const z = env.newVar("z");
 	}
 	const x = env.newVar();
-	return new ALam(x, new Composite(f1, a1), new Var(x));
+	const xc = env.newVar("c");
+	const xa = env.newVar("a");
+	return new ALam(x, new Composite(f1, a1),
+		new App(new App(new CtorCoercion(), tagf1),
+			new App(new App(new ArgCoercion(), tagf2), new Var(x))));
 }
 
 // #### generateBinder :: ref number × Set string → string
@@ -451,7 +455,10 @@ class Composite extends Type {
 				map: m1,
 				type: skolRho,
 				coercion: new ALam(x, new ForAll(m1, skolRho),
-					new GreatLambda(Array.from(m1.keys()), new Var(x)))
+					new GreatLambda(Array.from(m1.keys()),
+						new App(
+							new App(new CtorCoercion(), f1),
+							new Var(x))))
 			};
 		} else {
 			//   - 如果这个类型是协变的，展开其 arg 部分。
@@ -466,7 +473,10 @@ class Composite extends Type {
 				type: skolRho,
 				coercion: new ALam(x, new ForAll(m2, skolRho),
 					new GreatLambda(Array.from(m2.keys()),
-						new Var(x)))
+						new App(
+							new App(new CtorCoercion(), f1),
+							new App(new App(new ArgCoercion(), f2),
+								new Var(x)))))
 			};
 		}
 	}
@@ -584,7 +594,7 @@ class ForAll extends Type {
 // ### Meta Slot，推理过程中的未决议类型
 class MetaSlot extends Type {
 	/**
-	 * @param {MetaSlotVal} arg - Argument
+	 * @param {MetaSlotVal} arg - ArgCoercion
 	 */
 	constructor(arg) {
 		super();
@@ -937,8 +947,10 @@ class App extends Term {
 	betaRedex() {
 		this.fn = this.fn.betaRedex();
 		this.arg = this.arg.betaRedex();
-		if (this.fn instanceof Tag) {
+		if (this.fn instanceof Tag) { // We do not really "tag" something, just leave its argument
 			return this.arg;
+		} else if(this.fn instanceof App && (this.fn.fn instanceof CtorCoercion || this.fn.fn instanceof ArgCoercion)){
+			return new App(this.fn.arg, this.arg).betaRedex();
 		} else if (this.fn instanceof Inst && this.arg instanceof App && this.arg.fn instanceof Inst) {
 			let m = new Map(this.fn.args);
 			for (let [k, v] of this.arg.fn.args) {
@@ -1395,6 +1407,23 @@ class Inst extends Term {
 			buf.push(new Slot(k).inspect() + "->" + v.zonk().inspect());
 		}
 		return ("{" + buf.join(", ") + "}").green;
+	}
+}
+// ### System-F 的约制子特殊形式
+class CtorCoercion extends Term {
+	constructor() {
+		super();
+	}
+	inspect() {
+		return ("<CTOR>").red;
+	}
+}
+class ArgCoercion extends Term {
+	constructor() {
+		super();
+	}
+	inspect() {
+		return ("<ARG>").cyan;
 	}
 }
 

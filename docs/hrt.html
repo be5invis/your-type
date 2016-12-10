@@ -731,7 +731,11 @@
 		<span class="hljs-keyword">const</span> z = env.newVar(<span class="hljs-string">"z"</span>);
 	}
 	<span class="hljs-keyword">const</span> x = env.newVar();
-	<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> ALam(x, <span class="hljs-keyword">new</span> Composite(f1, a1), <span class="hljs-keyword">new</span> Var(x));
+	<span class="hljs-keyword">const</span> xc = env.newVar(<span class="hljs-string">"c"</span>);
+	<span class="hljs-keyword">const</span> xa = env.newVar(<span class="hljs-string">"a"</span>);
+	<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> ALam(x, <span class="hljs-keyword">new</span> Composite(f1, a1),
+		<span class="hljs-keyword">new</span> App(<span class="hljs-keyword">new</span> App(<span class="hljs-keyword">new</span> CtorCoercion(), tagf1),
+			<span class="hljs-keyword">new</span> App(<span class="hljs-keyword">new</span> App(<span class="hljs-keyword">new</span> ArgCoercion(), tagf2), <span class="hljs-keyword">new</span> Var(x))));
 }</pre></div></div>
             
         </li>
@@ -955,7 +959,10 @@
 				<span class="hljs-attr">map</span>: m1,
 				<span class="hljs-attr">type</span>: skolRho,
 				<span class="hljs-attr">coercion</span>: <span class="hljs-keyword">new</span> ALam(x, <span class="hljs-keyword">new</span> ForAll(m1, skolRho),
-					<span class="hljs-keyword">new</span> GreatLambda(<span class="hljs-built_in">Array</span>.from(m1.keys()), <span class="hljs-keyword">new</span> Var(x)))
+					<span class="hljs-keyword">new</span> GreatLambda(<span class="hljs-built_in">Array</span>.from(m1.keys()),
+						<span class="hljs-keyword">new</span> App(
+							<span class="hljs-keyword">new</span> App(<span class="hljs-keyword">new</span> CtorCoercion(), f1),
+							<span class="hljs-keyword">new</span> Var(x))))
 			};
 		} <span class="hljs-keyword">else</span> {</pre></div></div>
             
@@ -985,7 +992,10 @@
 				<span class="hljs-attr">type</span>: skolRho,
 				<span class="hljs-attr">coercion</span>: <span class="hljs-keyword">new</span> ALam(x, <span class="hljs-keyword">new</span> ForAll(m2, skolRho),
 					<span class="hljs-keyword">new</span> GreatLambda(<span class="hljs-built_in">Array</span>.from(m2.keys()),
-						<span class="hljs-keyword">new</span> Var(x)))
+						<span class="hljs-keyword">new</span> App(
+							<span class="hljs-keyword">new</span> App(<span class="hljs-keyword">new</span> CtorCoercion(), f1),
+							<span class="hljs-keyword">new</span> App(<span class="hljs-keyword">new</span> App(<span class="hljs-keyword">new</span> ArgCoercion(), f2),
+								<span class="hljs-keyword">new</span> Var(x)))))
 			};
 		}
 	}
@@ -1166,7 +1176,7 @@
             
             <div class="content"><div class='highlight'><pre><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">MetaSlot</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Type</span> </span>{
 	<span class="hljs-comment">/**
-	 * @param {MetaSlotVal} arg - Argument
+	 * @param {MetaSlotVal} arg - ArgCoercion
 	 */</span>
 	<span class="hljs-keyword">constructor</span>(arg) {
 		<span class="hljs-keyword">super</span>();
@@ -1785,8 +1795,10 @@
 	betaRedex() {
 		<span class="hljs-keyword">this</span>.fn = <span class="hljs-keyword">this</span>.fn.betaRedex();
 		<span class="hljs-keyword">this</span>.arg = <span class="hljs-keyword">this</span>.arg.betaRedex();
-		<span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.fn <span class="hljs-keyword">instanceof</span> Tag) {
+		<span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.fn <span class="hljs-keyword">instanceof</span> Tag) { <span class="hljs-comment">// We do not really "tag" something, just leave its argument</span>
 			<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.arg;
+		} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(<span class="hljs-keyword">this</span>.fn <span class="hljs-keyword">instanceof</span> App &amp;&amp; (<span class="hljs-keyword">this</span>.fn.fn <span class="hljs-keyword">instanceof</span> CtorCoercion || <span class="hljs-keyword">this</span>.fn.fn <span class="hljs-keyword">instanceof</span> ArgCoercion)){
+			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> App(<span class="hljs-keyword">this</span>.fn.arg, <span class="hljs-keyword">this</span>.arg).betaRedex();
 		} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.fn <span class="hljs-keyword">instanceof</span> Inst &amp;&amp; <span class="hljs-keyword">this</span>.arg <span class="hljs-keyword">instanceof</span> App &amp;&amp; <span class="hljs-keyword">this</span>.arg.fn <span class="hljs-keyword">instanceof</span> Inst) {
 			<span class="hljs-keyword">let</span> m = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Map</span>(<span class="hljs-keyword">this</span>.fn.args);
 			<span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> [k, v] <span class="hljs-keyword">of</span> <span class="hljs-keyword">this</span>.arg.fn.args) {
@@ -2511,6 +2523,36 @@
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-86">&#182;</a>
               </div>
+              <h3 id="system-f-">System-F 的约制子特殊形式</h3>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">CtorCoercion</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Term</span> </span>{
+	<span class="hljs-keyword">constructor</span>() {
+		<span class="hljs-keyword">super</span>();
+	}
+	inspect() {
+		<span class="hljs-keyword">return</span> (<span class="hljs-string">"&lt;CTOR&gt;"</span>).red;
+	}
+}
+<span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">ArgCoercion</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Term</span> </span>{
+	<span class="hljs-keyword">constructor</span>() {
+		<span class="hljs-keyword">super</span>();
+	}
+	inspect() {
+		<span class="hljs-keyword">return</span> (<span class="hljs-string">"&lt;ARG&gt;"</span>).cyan;
+	}
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-87">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-87">&#182;</a>
+              </div>
               <h2 id="-">测试部分</h2>
 <h4 id="translatetype-any-type">translateType :: [any] → Type</h4>
 
@@ -2531,11 +2573,11 @@
         </li>
         
         
-        <li id="section-87">
+        <li id="section-88">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-87">&#182;</a>
+                <a class="pilcrow" href="#section-88">&#182;</a>
               </div>
               <p>Existential 类型可以用普通的多态类型模拟</p>
 <p>$\exists \overline x. \rho = \forall Q. (\forall \overline x. \rho \rightarrow Q)\rightarrow Q$</p>
@@ -2552,11 +2594,11 @@
         </li>
         
         
-        <li id="section-88">
+        <li id="section-89">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-88">&#182;</a>
+                <a class="pilcrow" href="#section-89">&#182;</a>
               </div>
               <p>我们目前只知道 $\rightarrow$ 是反变的，因此只处理这一种情况。</p>
 
@@ -2581,11 +2623,11 @@
         </li>
         
         
-        <li id="section-89">
+        <li id="section-90">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-89">&#182;</a>
+                <a class="pilcrow" href="#section-90">&#182;</a>
               </div>
               <h4 id="translate-any-term">translate :: [any] → Term</h4>
 
@@ -2634,11 +2676,11 @@
         </li>
         
         
-        <li id="section-90">
+        <li id="section-91">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-90">&#182;</a>
+                <a class="pilcrow" href="#section-91">&#182;</a>
               </div>
               <p>测试：「全局变量」表</p>
 
@@ -2667,11 +2709,11 @@
         </li>
         
         
-        <li id="section-91">
+        <li id="section-92">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-91">&#182;</a>
+                <a class="pilcrow" href="#section-92">&#182;</a>
               </div>
               <p>测试：程序</p>
 
@@ -2706,11 +2748,11 @@
         </li>
         
         
-        <li id="section-92">
+        <li id="section-93">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-92">&#182;</a>
+                <a class="pilcrow" href="#section-93">&#182;</a>
               </div>
               <p>应当返回：<code>(int * boolean) * list int</code></p>
 
@@ -2721,11 +2763,11 @@
         </li>
         
         
-        <li id="section-93">
+        <li id="section-94">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-93">&#182;</a>
+                <a class="pilcrow" href="#section-94">&#182;</a>
               </div>
               <p>应当返回：程序 a 的约制版本（非常长的）</p>
 
@@ -2736,11 +2778,11 @@
         </li>
         
         
-        <li id="section-94">
+        <li id="section-95">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-94">&#182;</a>
+                <a class="pilcrow" href="#section-95">&#182;</a>
               </div>
               <p>应当返回：程序 a 的约制版本，已规约的</p>
 
