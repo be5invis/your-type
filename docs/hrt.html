@@ -180,7 +180,7 @@
             
             <div class="content"><div class='highlight'><pre>	newVar(tag) {
 		<span class="hljs-keyword">this</span>.uniqs.val += <span class="hljs-number">1</span>;
-		<span class="hljs-keyword">return</span> (tag || <span class="hljs-string">"_"</span>) + <span class="hljs-keyword">this</span>.uniqs.val;
+		<span class="hljs-keyword">return</span> <span class="hljs-string">"#"</span> + (tag || <span class="hljs-string">"_"</span>) + <span class="hljs-keyword">this</span>.uniqs.val;
 	}</pre></div></div>
             
         </li>
@@ -2431,7 +2431,7 @@
 	}
 	inspect() {
 		<span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.quantifiers.length) {
-			<span class="hljs-keyword">return</span> <span class="hljs-string">"("</span> + (<span class="hljs-string">"Λ{"</span> + <span class="hljs-keyword">this</span>.quantifiers.join(<span class="hljs-string">" "</span>) + <span class="hljs-string">"}. "</span>).red + <span class="hljs-keyword">this</span>.body.inspect() + <span class="hljs-string">")"</span>;
+			<span class="hljs-keyword">return</span> <span class="hljs-string">"("</span> + (<span class="hljs-string">"Λ{"</span> + <span class="hljs-keyword">this</span>.quantifiers.join(<span class="hljs-string">" "</span>) + <span class="hljs-string">"}. "</span>).red.bold + <span class="hljs-keyword">this</span>.body.inspect() + <span class="hljs-string">")"</span>;
 		} <span class="hljs-keyword">else</span> {
 			<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.body.inspect();
 		}
@@ -2742,9 +2742,22 @@
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-93">&#182;</a>
               </div>
-              <p>应当返回：程序 a 的约制版本
-console.log(“\nSystem F Notations: “, tagged);
-应当返回：程序 a 的约制版本，已规约的</p>
+              <p>应当返回：程序 a 的约制版本（非常长的）</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-built_in">console</span>.log(<span class="hljs-string">"\nSystem F Notations: "</span>, tagged);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-94">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-94">&#182;</a>
+              </div>
+              <p>应当返回：程序 a 的约制版本，已规约的</p>
 
             </div>
             

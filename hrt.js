@@ -66,7 +66,7 @@ class Environment {
 	// #### newVar :: *this* Environment → string
 	newVar(tag) {
 		this.uniqs.val += 1;
-		return (tag || "_") + this.uniqs.val;
+		return "#" + (tag || "_") + this.uniqs.val;
 	}
 	// #### newMetaSlotVal :: *this* Environment → MetaSlotVal
 	// 生成新的 Meta slot value
@@ -1353,7 +1353,7 @@ class GreatLambda extends Term {
 	}
 	inspect() {
 		if (this.quantifiers.length) {
-			return "(" + ("Λ{" + this.quantifiers.join(" ") + "}. ").red + this.body.inspect() + ")";
+			return "(" + ("Λ{" + this.quantifiers.join(" ") + "}. ").red.bold + this.body.inspect() + ")";
 		} else {
 			return this.body.inspect();
 		}
@@ -1542,7 +1542,7 @@ const b = translate(
 const {type, tagged} = a.inferSigma(env);
 // 应当返回：`(int * boolean) * list int`
 console.log("Type:", type);
-// 应当返回：程序 a 的约制版本
-// console.log("\nSystem F Notations: ", tagged);
+// 应当返回：程序 a 的约制版本（非常长的）
+console.log("\nSystem F Notations: ", tagged);
 // 应当返回：程序 a 的约制版本，已规约的
 console.log("\nSystem F Redex: ", tagged.betaRedex());
