@@ -315,12 +315,14 @@ function subsCheckComposite(env, contravariant, f1, f2, a1, a2) {
 		tagf2 = a2.subsCheck(env, a1);
 		const x = env.newVar("x");
 		const y = env.newVar("y");
-		return new Tag(new Composite(f1, a1))
 	} else {
 		tagf2 = a1.subsCheckRho(env, a2);
 		const z = env.newVar("z");
-		return new Tag(new Composite(f1, a1))
 	}
+	const x = env.newVar();
+	return new ALam(x, new Composite(f1, a1),
+		new App(tagf1,
+			new App(tagf2, new Var(x))));
 }
 
 // #### generateBinder :: ref number × Set string → string
@@ -451,8 +453,7 @@ class Composite extends Type {
 				map: m1,
 				type: skolRho,
 				coercion: new ALam(x, new ForAll(m1, skolRho),
-					new GreatLambda(Array.from(m1.keys()),
-						new Var(x)))
+					new GreatLambda(Array.from(m1.keys()), new App(f1, new Var(x))))
 			};
 		} else {
 			//   - 如果这个类型是协变的，展开其 arg 部分。
@@ -466,7 +467,7 @@ class Composite extends Type {
 				type: skolRho,
 				coercion: new ALam(x, new ForAll(m2, skolRho),
 					new App(f2, new GreatLambda(Array.from(m2.keys()),
-						new Var(x))))
+						new App(f1, new App(f2, new Var(x))))))
 			};
 		}
 	}
@@ -937,13 +938,16 @@ class App extends Term {
 	betaRedex() {
 		this.fn = this.fn.betaRedex();
 		this.arg = this.arg.betaRedex();
-		while(this.fn instanceof Ann){
-			this.fn = this.fn.body;
-		}
 		if (this.fn instanceof Tag) {
 			return this.arg;
+		} else if (this.fn instanceof Inst && this.arg instanceof App && this.arg.fn instanceof Inst) {
+			let m = new Map(this.fn.args);
+			for (let [k, v] of this.arg.fn.args) {
+				m.set(k, v);
+			}
+			return new App(new Inst(m), this.arg.arg);
 		} else if (this.fn instanceof ALam) {
-			return this.fn.body.subst(this.fn.param, new Ann(this.arg, this.fn.type)).betaRedex();
+			return this.fn.body.subst(this.fn.param, new App(new Tag(this.fn.type), this.arg)).betaRedex();
 		} else {
 			return this;
 		}
@@ -1319,7 +1323,7 @@ class Ann extends Term {
 }
 // 以下的项目为 System F 的高阶构造，它们主要用于构造约制子。
 // 
-// ### System-F 类型抽象，$\Lambda$
+// ### System-F 类型抽象，$\Lambda\overline\alpha.e$
 class GreatLambda extends Term {
 	/**
 	 * @param {Array<Slot>} quantifiers
@@ -1363,7 +1367,7 @@ class GreatLambda extends Term {
 		return new GreatLambda(this.quantifiers, this.body.subst(id, replacement));
 	}
 }
-// ### Tagging term，「指定」一个类型的行为
+// ### Tagging term，「指定」一个类型的行为。$\mathrm{Tag}(\sigma)=\lambda x:\sigma.x$
 class Tag extends Term {
 	/**
 	 * @param {Type} type
@@ -1376,13 +1380,13 @@ class Tag extends Term {
 		return (" (as " + this.type.zonk().inspect() + ")").yellow;
 	}
 }
-// ### System-F 显式类型实例化
+// ### System-F 显式类型实例化。$\mathrm{Inst}(\alpha\rightarrow\rho)=\lambda x.x^{\{\alpha=\rho\}}$
 class Inst extends Term {
 	/**
 	 * @param {Map<string, Type>} args
 	 */
 	constructor(args) {
-		if(!args)debugger;
+		if (!args)debugger;
 		super();
 		this.args = args;
 	}
@@ -1539,6 +1543,6 @@ const {type, tagged} = a.inferSigma(env);
 // 应当返回：`(int * boolean) * list int`
 console.log("Type:", type);
 // 应当返回：程序 a 的约制版本
-console.log("\nSystem F Notations: ", tagged);
+// console.log("\nSystem F Notations: ", tagged);
 // 应当返回：程序 a 的约制版本，已规约的
 console.log("\nSystem F Redex: ", tagged.betaRedex());

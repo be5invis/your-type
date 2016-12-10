@@ -726,12 +726,14 @@
 		tagf2 = a2.subsCheck(env, a1);
 		<span class="hljs-keyword">const</span> x = env.newVar(<span class="hljs-string">"x"</span>);
 		<span class="hljs-keyword">const</span> y = env.newVar(<span class="hljs-string">"y"</span>);
-		<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Tag(<span class="hljs-keyword">new</span> Composite(f1, a1))
 	} <span class="hljs-keyword">else</span> {
 		tagf2 = a1.subsCheckRho(env, a2);
 		<span class="hljs-keyword">const</span> z = env.newVar(<span class="hljs-string">"z"</span>);
-		<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Tag(<span class="hljs-keyword">new</span> Composite(f1, a1))
 	}
+	<span class="hljs-keyword">const</span> x = env.newVar();
+	<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> ALam(x, <span class="hljs-keyword">new</span> Composite(f1, a1),
+		<span class="hljs-keyword">new</span> App(tagf1,
+			<span class="hljs-keyword">new</span> App(tagf2, <span class="hljs-keyword">new</span> Var(x))));
 }</pre></div></div>
             
         </li>
@@ -955,8 +957,7 @@
 				<span class="hljs-attr">map</span>: m1,
 				<span class="hljs-attr">type</span>: skolRho,
 				<span class="hljs-attr">coercion</span>: <span class="hljs-keyword">new</span> ALam(x, <span class="hljs-keyword">new</span> ForAll(m1, skolRho),
-					<span class="hljs-keyword">new</span> GreatLambda(<span class="hljs-built_in">Array</span>.from(m1.keys()),
-						<span class="hljs-keyword">new</span> Var(x)))
+					<span class="hljs-keyword">new</span> GreatLambda(<span class="hljs-built_in">Array</span>.from(m1.keys()), <span class="hljs-keyword">new</span> App(f1, <span class="hljs-keyword">new</span> Var(x))))
 			};
 		} <span class="hljs-keyword">else</span> {</pre></div></div>
             
@@ -985,7 +986,7 @@
 				<span class="hljs-attr">type</span>: skolRho,
 				<span class="hljs-attr">coercion</span>: <span class="hljs-keyword">new</span> ALam(x, <span class="hljs-keyword">new</span> ForAll(m2, skolRho),
 					<span class="hljs-keyword">new</span> App(f2, <span class="hljs-keyword">new</span> GreatLambda(<span class="hljs-built_in">Array</span>.from(m2.keys()),
-						<span class="hljs-keyword">new</span> Var(x))))
+						<span class="hljs-keyword">new</span> App(f1, <span class="hljs-keyword">new</span> App(f2, <span class="hljs-keyword">new</span> Var(x))))))
 			};
 		}
 	}
@@ -1785,13 +1786,16 @@
 	betaRedex() {
 		<span class="hljs-keyword">this</span>.fn = <span class="hljs-keyword">this</span>.fn.betaRedex();
 		<span class="hljs-keyword">this</span>.arg = <span class="hljs-keyword">this</span>.arg.betaRedex();
-		<span class="hljs-keyword">while</span>(<span class="hljs-keyword">this</span>.fn <span class="hljs-keyword">instanceof</span> Ann){
-			<span class="hljs-keyword">this</span>.fn = <span class="hljs-keyword">this</span>.fn.body;
-		}
 		<span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.fn <span class="hljs-keyword">instanceof</span> Tag) {
 			<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.arg;
+		} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.fn <span class="hljs-keyword">instanceof</span> Inst &amp;&amp; <span class="hljs-keyword">this</span>.arg <span class="hljs-keyword">instanceof</span> App &amp;&amp; <span class="hljs-keyword">this</span>.arg.fn <span class="hljs-keyword">instanceof</span> Inst) {
+			<span class="hljs-keyword">let</span> m = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Map</span>(<span class="hljs-keyword">this</span>.fn.args);
+			<span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> [k, v] <span class="hljs-keyword">of</span> <span class="hljs-keyword">this</span>.arg.fn.args) {
+				m.set(k, v);
+			}
+			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> App(<span class="hljs-keyword">new</span> Inst(m), <span class="hljs-keyword">this</span>.arg.arg);
 		} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.fn <span class="hljs-keyword">instanceof</span> ALam) {
-			<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.fn.body.subst(<span class="hljs-keyword">this</span>.fn.param, <span class="hljs-keyword">new</span> Ann(<span class="hljs-keyword">this</span>.arg, <span class="hljs-keyword">this</span>.fn.type)).betaRedex();
+			<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.fn.body.subst(<span class="hljs-keyword">this</span>.fn.param, <span class="hljs-keyword">new</span> App(<span class="hljs-keyword">new</span> Tag(<span class="hljs-keyword">this</span>.fn.type), <span class="hljs-keyword">this</span>.arg)).betaRedex();
 		} <span class="hljs-keyword">else</span> {
 			<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>;
 		}
@@ -2394,7 +2398,7 @@
                 <a class="pilcrow" href="#section-83">&#182;</a>
               </div>
               <p>以下的项目为 System F 的高阶构造，它们主要用于构造约制子。</p>
-<h3 id="system-f-lambda-">System-F 类型抽象，$\Lambda$</h3>
+<h3 id="system-f-lambda-overline-alpha-e-">System-F 类型抽象，$\Lambda\overline\alpha.e$</h3>
 
             </div>
             
@@ -2451,7 +2455,7 @@
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-84">&#182;</a>
               </div>
-              <h3 id="tagging-term-">Tagging term，「指定」一个类型的行为</h3>
+              <h3 id="tagging-term-mathrm-tag-sigma-lambda-x-sigma-x-">Tagging term，「指定」一个类型的行为。$\mathrm{Tag}(\sigma)=\lambda x:\sigma.x$</h3>
 
             </div>
             
@@ -2477,7 +2481,7 @@
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-85">&#182;</a>
               </div>
-              <h3 id="system-f-">System-F 显式类型实例化</h3>
+              <h3 id="system-f-mathrm-inst-alpha-rightarrow-rho-lambda-x-x-alpha-rho-">System-F 显式类型实例化。$\mathrm{Inst}(\alpha\rightarrow\rho)=\lambda x.x^{{\alpha=\rho}}$</h3>
 
             </div>
             
@@ -2486,7 +2490,7 @@
 	 * @param {Map&lt;string, Type&gt;} args
 	 */</span>
 	<span class="hljs-keyword">constructor</span>(args) {
-		<span class="hljs-keyword">if</span>(!args)<span class="hljs-keyword">debugger</span>;
+		<span class="hljs-keyword">if</span> (!args)<span class="hljs-keyword">debugger</span>;
 		<span class="hljs-keyword">super</span>();
 		<span class="hljs-keyword">this</span>.args = args;
 	}
@@ -2738,22 +2742,9 @@
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-93">&#182;</a>
               </div>
-              <p>应当返回：程序 a 的约制版本</p>
-
-            </div>
-            
-            <div class="content"><div class='highlight'><pre><span class="hljs-built_in">console</span>.log(<span class="hljs-string">"\nSystem F Notations: "</span>, tagged);</pre></div></div>
-            
-        </li>
-        
-        
-        <li id="section-94">
-            <div class="annotation">
-              
-              <div class="pilwrap ">
-                <a class="pilcrow" href="#section-94">&#182;</a>
-              </div>
-              <p>应当返回：程序 a 的约制版本，已规约的</p>
+              <p>应当返回：程序 a 的约制版本
+console.log(“\nSystem F Notations: “, tagged);
+应当返回：程序 a 的约制版本，已规约的</p>
 
             </div>
             
