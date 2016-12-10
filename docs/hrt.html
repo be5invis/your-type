@@ -2702,20 +2702,6 @@
 			[<span class="hljs-string">"&amp;"</span>, [<span class="hljs-string">"strange"</span>, <span class="hljs-string">"id"</span>], [<span class="hljs-string">"id_dyn"</span>, [<span class="hljs-string">"box_list"</span>, <span class="hljs-number">1</span>]]]]]
 );
 
-<span class="hljs-keyword">const</span> b = translate(
-	[<span class="hljs-string">"letrec"</span>,
-		[<span class="hljs-string">"id_dyn"</span>,
-			[<span class="hljs-string">"lambda"</span>,
-				[<span class="hljs-string">"x"</span>, [<span class="hljs-string">"exists"</span>, [<span class="hljs-string">"'a"</span>], [<span class="hljs-string">"box"</span>, <span class="hljs-string">"'a"</span>]]],
-				[<span class="hljs-string">"::"</span>, [<span class="hljs-string">"unbox"</span>, <span class="hljs-string">"x"</span>], [<span class="hljs-string">"list"</span>, <span class="hljs-string">"int"</span>]]],
-			[<span class="hljs-string">"-&gt;"</span>, [<span class="hljs-string">"exists"</span>, [<span class="hljs-string">"'a"</span>], [<span class="hljs-string">"box"</span>, <span class="hljs-string">"'a"</span>]], [<span class="hljs-string">"list"</span>, <span class="hljs-string">"int"</span>]]],
-		[<span class="hljs-string">"strange"</span>,
-			[<span class="hljs-string">"lambda"</span>,
-				[<span class="hljs-string">"f"</span>, [<span class="hljs-string">"forall"</span>, [<span class="hljs-string">"'a"</span>], [<span class="hljs-string">"-&gt;"</span>, <span class="hljs-string">"'a"</span>, <span class="hljs-string">"'a"</span>]]],
-				[<span class="hljs-string">"&amp;"</span>, [<span class="hljs-string">"f"</span>, <span class="hljs-number">1</span>], [<span class="hljs-string">"f"</span>, <span class="hljs-literal">null</span>]]]],
-		[<span class="hljs-string">"strange"</span>, <span class="hljs-string">"id"</span>]]
-);
-
 <span class="hljs-keyword">const</span> {type, tagged} = a.inferSigma(env);</pre></div></div>
             
         </li>

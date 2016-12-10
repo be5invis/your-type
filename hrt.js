@@ -1525,20 +1525,6 @@ const a = translate(
 			["&", ["strange", "id"], ["id_dyn", ["box_list", 1]]]]]
 );
 
-const b = translate(
-	["letrec",
-		["id_dyn",
-			["lambda",
-				["x", ["exists", ["'a"], ["box", "'a"]]],
-				["::", ["unbox", "x"], ["list", "int"]]],
-			["->", ["exists", ["'a"], ["box", "'a"]], ["list", "int"]]],
-		["strange",
-			["lambda",
-				["f", ["forall", ["'a"], ["->", "'a", "'a"]]],
-				["&", ["f", 1], ["f", null]]]],
-		["strange", "id"]]
-);
-
 const {type, tagged} = a.inferSigma(env);
 // 应当返回：`(int * boolean) * list int`
 console.log("Type:", type);
