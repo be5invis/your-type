@@ -938,7 +938,7 @@ class App extends Term {
 		this.arg = arg;
 	}
 	inspect() {
-		if (this.arg instanceof Lit || this.arg instanceof Var) {
+		if (this.arg instanceof Lit || this.arg instanceof Var || this.arg instanceof Tag) {
 			return util.inspect(this.fn) + " " + this.arg.inspect();
 		} else {
 			return util.inspect(this.fn) + " (" + this.arg.inspect() + ")";
@@ -1059,7 +1059,7 @@ class ALam extends Term {
 		this.body = body;
 	}
 	inspect() {
-		return "(\\" + this.param + (":" + this.type.zonk().inspect()).blue + ". " + this.body.inspect() + ")";
+		return "(\\" + this.param + " : " + ( this.type.zonk().inspect()).blue + " . " + this.body.inspect() + ")";
 	}
 	betaRedex() {
 		this.body = this.body.betaRedex();
@@ -1388,7 +1388,7 @@ class Tag extends Term {
 		this.type = type;
 	}
 	inspect() {
-		return (" (as " + this.type.zonk().inspect() + ")").yellow;
+		return ("<as " + this.type.zonk().inspect() + ">").yellow;
 	}
 }
 // ### System-F 显式类型实例化。$\mathrm{Inst}(\alpha\rightarrow\rho)=\lambda x.x^{\{\alpha=\rho\}}$

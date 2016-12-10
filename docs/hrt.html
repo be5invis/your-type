@@ -1786,7 +1786,7 @@
 		<span class="hljs-keyword">this</span>.arg = arg;
 	}
 	inspect() {
-		<span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.arg <span class="hljs-keyword">instanceof</span> Lit || <span class="hljs-keyword">this</span>.arg <span class="hljs-keyword">instanceof</span> Var) {
+		<span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.arg <span class="hljs-keyword">instanceof</span> Lit || <span class="hljs-keyword">this</span>.arg <span class="hljs-keyword">instanceof</span> Var || <span class="hljs-keyword">this</span>.arg <span class="hljs-keyword">instanceof</span> Tag) {
 			<span class="hljs-keyword">return</span> util.inspect(<span class="hljs-keyword">this</span>.fn) + <span class="hljs-string">" "</span> + <span class="hljs-keyword">this</span>.arg.inspect();
 		} <span class="hljs-keyword">else</span> {
 			<span class="hljs-keyword">return</span> util.inspect(<span class="hljs-keyword">this</span>.fn) + <span class="hljs-string">" ("</span> + <span class="hljs-keyword">this</span>.arg.inspect() + <span class="hljs-string">")"</span>;
@@ -1985,7 +1985,7 @@
 		<span class="hljs-keyword">this</span>.body = body;
 	}
 	inspect() {
-		<span class="hljs-keyword">return</span> <span class="hljs-string">"(\\"</span> + <span class="hljs-keyword">this</span>.param + (<span class="hljs-string">":"</span> + <span class="hljs-keyword">this</span>.type.zonk().inspect()).blue + <span class="hljs-string">". "</span> + <span class="hljs-keyword">this</span>.body.inspect() + <span class="hljs-string">")"</span>;
+		<span class="hljs-keyword">return</span> <span class="hljs-string">"(\\"</span> + <span class="hljs-keyword">this</span>.param + <span class="hljs-string">" : "</span> + ( <span class="hljs-keyword">this</span>.type.zonk().inspect()).blue + <span class="hljs-string">" . "</span> + <span class="hljs-keyword">this</span>.body.inspect() + <span class="hljs-string">")"</span>;
 	}
 	betaRedex() {
 		<span class="hljs-keyword">this</span>.body = <span class="hljs-keyword">this</span>.body.betaRedex();
@@ -2479,7 +2479,7 @@
 		<span class="hljs-keyword">this</span>.type = type;
 	}
 	inspect() {
-		<span class="hljs-keyword">return</span> (<span class="hljs-string">" (as "</span> + <span class="hljs-keyword">this</span>.type.zonk().inspect() + <span class="hljs-string">")"</span>).yellow;
+		<span class="hljs-keyword">return</span> (<span class="hljs-string">"&lt;as "</span> + <span class="hljs-keyword">this</span>.type.zonk().inspect() + <span class="hljs-string">"&gt;"</span>).yellow;
 	}
 }</pre></div></div>
             
