@@ -445,15 +445,15 @@ class Composite extends Type {
 	// 复合类型的斯科伦化需要小心地处理其参数部分：
 	skolmeize(env) {
 		let {map: m1, type: t1, coercion: f1} = this.fn.skolmeize(env);
-		const x = env.newVar("SK-X");
 		if (this.contravariant) {
 			//   - 如果这个类型是反变的，保留其 arg 部分；
 			const skolRho = new Composite(t1, this.arg, this.contravariant);
+			const x = env.newVar("S");
 			return {
 				map: m1,
 				type: skolRho,
 				coercion: new ALam(x, new ForAll(m1, skolRho),
-					new GreatLambda(Array.from(m1.keys()), new App(f1, new Var(x))))
+					new GreatLambda(Array.from(m1.keys()), new Var(x)))
 			};
 		} else {
 			//   - 如果这个类型是协变的，展开其 arg 部分。
@@ -462,12 +462,13 @@ class Composite extends Type {
 				m2.set(k, v);
 			}
 			const skolRho = new Composite(t1, t2, this.contravariant);
+			const x = env.newVar("R");
 			return {
 				map: m2,
 				type: skolRho,
 				coercion: new ALam(x, new ForAll(m2, skolRho),
-					new App(f2, new GreatLambda(Array.from(m2.keys()),
-						new App(f1, new App(f2, new Var(x))))))
+					new GreatLambda(Array.from(m2.keys()),
+						new Var(x)))
 			};
 		}
 	}

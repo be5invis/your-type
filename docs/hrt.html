@@ -934,7 +934,6 @@
             
             <div class="content"><div class='highlight'><pre>	skolmeize(env) {
 		<span class="hljs-keyword">let</span> {<span class="hljs-attr">map</span>: m1, <span class="hljs-attr">type</span>: t1, <span class="hljs-attr">coercion</span>: f1} = <span class="hljs-keyword">this</span>.fn.skolmeize(env);
-		<span class="hljs-keyword">const</span> x = env.newVar(<span class="hljs-string">"SK-X"</span>);
 		<span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.contravariant) {</pre></div></div>
             
         </li>
@@ -953,11 +952,12 @@
             </div>
             
             <div class="content"><div class='highlight'><pre>			<span class="hljs-keyword">const</span> skolRho = <span class="hljs-keyword">new</span> Composite(t1, <span class="hljs-keyword">this</span>.arg, <span class="hljs-keyword">this</span>.contravariant);
+			<span class="hljs-keyword">const</span> x = env.newVar(<span class="hljs-string">"S"</span>);
 			<span class="hljs-keyword">return</span> {
 				<span class="hljs-attr">map</span>: m1,
 				<span class="hljs-attr">type</span>: skolRho,
 				<span class="hljs-attr">coercion</span>: <span class="hljs-keyword">new</span> ALam(x, <span class="hljs-keyword">new</span> ForAll(m1, skolRho),
-					<span class="hljs-keyword">new</span> GreatLambda(<span class="hljs-built_in">Array</span>.from(m1.keys()), <span class="hljs-keyword">new</span> App(f1, <span class="hljs-keyword">new</span> Var(x))))
+					<span class="hljs-keyword">new</span> GreatLambda(<span class="hljs-built_in">Array</span>.from(m1.keys()), <span class="hljs-keyword">new</span> Var(x)))
 			};
 		} <span class="hljs-keyword">else</span> {</pre></div></div>
             
@@ -981,12 +981,13 @@
 				m2.set(k, v);
 			}
 			<span class="hljs-keyword">const</span> skolRho = <span class="hljs-keyword">new</span> Composite(t1, t2, <span class="hljs-keyword">this</span>.contravariant);
+			<span class="hljs-keyword">const</span> x = env.newVar(<span class="hljs-string">"R"</span>);
 			<span class="hljs-keyword">return</span> {
 				<span class="hljs-attr">map</span>: m2,
 				<span class="hljs-attr">type</span>: skolRho,
 				<span class="hljs-attr">coercion</span>: <span class="hljs-keyword">new</span> ALam(x, <span class="hljs-keyword">new</span> ForAll(m2, skolRho),
-					<span class="hljs-keyword">new</span> App(f2, <span class="hljs-keyword">new</span> GreatLambda(<span class="hljs-built_in">Array</span>.from(m2.keys()),
-						<span class="hljs-keyword">new</span> App(f1, <span class="hljs-keyword">new</span> App(f2, <span class="hljs-keyword">new</span> Var(x))))))
+					<span class="hljs-keyword">new</span> GreatLambda(<span class="hljs-built_in">Array</span>.from(m2.keys()),
+						<span class="hljs-keyword">new</span> Var(x)))
 			};
 		}
 	}
