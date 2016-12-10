@@ -1366,7 +1366,7 @@ class GreatLambda extends Term {
 	}
 	format() {
 		if (this.quantifiers.length) {
-			return ["Λ".red.bold, this.quantifiers.map(x => new Slot(x).format()), this.body.format()];
+			return ["Λ".yellow.bold, this.quantifiers.map(x => new Slot(x).format()), this.body.format()];
 		} else {
 			return this.body.format();
 		}
@@ -1393,7 +1393,7 @@ class Tag extends Term {
 		return true;
 	}
 	format() {
-		return ["as".red.bold, this.type.zonk().format()];
+		return ["as".yellow.bold, this.type.zonk().format()];
 	}
 }
 // ### System-F 显式类型实例化。$\mathrm{Inst}(\alpha\rightarrow\rho)=\lambda x.x^{\{\alpha=\rho\}}$
@@ -1415,7 +1415,7 @@ class Inst extends Term {
 			for (let [k, v] of this.args) {
 				buf.push(['=', new Slot(k).format(), v.zonk().format()]);
 			}
-			return ["inst".red.bold].concat(buf);
+			return ["inst".yellow.bold].concat(buf);
 		} else {
 			return "";
 		}
