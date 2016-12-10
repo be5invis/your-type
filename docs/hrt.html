@@ -731,9 +731,7 @@
 		<span class="hljs-keyword">const</span> z = env.newVar(<span class="hljs-string">"z"</span>);
 	}
 	<span class="hljs-keyword">const</span> x = env.newVar();
-	<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> ALam(x, <span class="hljs-keyword">new</span> Composite(f1, a1),
-		<span class="hljs-keyword">new</span> App(tagf1,
-			<span class="hljs-keyword">new</span> App(tagf2, <span class="hljs-keyword">new</span> Var(x))));
+	<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> ALam(x, <span class="hljs-keyword">new</span> Composite(f1, a1), <span class="hljs-keyword">new</span> Var(x));
 }</pre></div></div>
             
         </li>

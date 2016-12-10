@@ -320,9 +320,7 @@ function subsCheckComposite(env, contravariant, f1, f2, a1, a2) {
 		const z = env.newVar("z");
 	}
 	const x = env.newVar();
-	return new ALam(x, new Composite(f1, a1),
-		new App(tagf1,
-			new App(tagf2, new Var(x))));
+	return new ALam(x, new Composite(f1, a1), new Var(x));
 }
 
 // #### generateBinder :: ref number × Set string → string
