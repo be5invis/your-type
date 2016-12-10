@@ -6,6 +6,7 @@
 
 
 const colors = require("colors");
+const stripAnsi = require('strip-ansi');
 const util = require("util");
 
 // ## 第一部分，环境 $\Gamma$
@@ -137,8 +138,8 @@ function rawNameOfskolmeizedName(n) {
 // 可以看出，$\sigma$ 类型为直接包含多态的类型，$\rho$ 类型则为嵌有多态结构的复合类型。在传统的 Hindley-Milner 系统中，$\rho$ 类型的第二种形式并不允许，它和 $\tau$ 类型完全等价。
 class Type {
 	constructor() {}
-	// #### inspect :: *this* Type → string
-	inspect() {}
+	// #### format :: *this* Type → string
+	format() {}
 	// #### getMetaSlots :: *this* Type → Map number MetaSlot
 	// 获取当前类型中所有出现的 Meta slot。返回一个 id 到 meta slot 的映射。根据 Meta slot value 的定义，任何两个 id 相同的 Meta slot 都视作相等。
 	/**
@@ -348,8 +349,8 @@ class Primitive extends Type {
 		super();
 		this.name = name;
 	}
-	inspect() {
-		return this.name;
+	format() {
+		return this.name.yellow;
 	}
 }
 // ### 限制的类型变量，$a$
@@ -367,8 +368,8 @@ class Slot extends Type {
 		super();
 		this.name = name;
 	}
-	inspect() {
-		return "'" + this.name;
+	format() {
+		return ("'" + this.name).green;
 	}
 	_getFreeSlots(bound, a) {
 		if (!bound.has(this.name) && !a.has(this.name)) {
@@ -412,21 +413,11 @@ class Composite extends Type {
 		this.arg = arg;
 		this.contravariant = contravariant || false;
 	}
-	inspect() {
-		if (this.fn instanceof Composite && this.fn.fn instanceof Primitive && !/^\w/.test(this.fn.fn.name)) {
-			const left = this.fn.arg;
-			const op = this.fn.fn;
-			if (left instanceof Primitive || left instanceof Slot) {
-				return left.inspect() + " " + op.name + " " + this.arg.inspect();
-			} else {
-				return "(" + left.inspect() + ") " + op.name + " " + this.arg.inspect();
-			}
+	format() {
+		if (this.fn instanceof Composite) {
+			return this.fn.format().concat([ this.arg.format()]);
 		} else {
-			if (this.arg instanceof Primitive || this.arg instanceof Slot) {
-				return this.fn.inspect() + " " + this.arg.inspect();
-			} else {
-				return this.fn.inspect() + " (" + this.arg.inspect() + ")";
-			}
+			return [this.fn.format(), this.arg.format()];
 		}
 	}
 	_getMetaSlots(a) {
@@ -504,11 +495,11 @@ class ForAll extends Type {
 		this.quantifiers = quantifiers;
 		this.body = body;
 	}
-	inspect() {
+	format() {
 		if (this.quantifiers.length) {
-			return "forall " + this.quantifiers.join(" ") + ". " + this.body.inspect();
+			return ["forall".cyan.bold, this.quantifiers.map(x => new Slot(x).format()), this.body.format()];
 		} else {
-			return this.body.inspect();
+			return this.body.format();
 		}
 	}
 	_getMetaSlots(a) {
@@ -600,7 +591,7 @@ class MetaSlot extends Type {
 		super();
 		this.arg = arg;
 	}
-	inspect() {
+	format() {
 		return ("?" + this.arg.id).red.bold;
 	}
 	_getMetaSlots(a) {
@@ -657,7 +648,7 @@ function unify(t1, t2) {
 		return true;
 	}
 	if (t1 instanceof Primitive && t2 instanceof Primitive && t1.name === t2.name) { return true; }
-	throw new Error(`Cannot unify ${t1.inspect()} with ${t2.inspect()}`)
+	throw new Error(`Cannot unify ${t1.format()} with ${t2.format()}`)
 }
 /**
  * @param {Type} t
@@ -763,7 +754,7 @@ class Term {
 	isAtomic() {
 		return false;
 	}
-	inspect() {}
+	format() {}
 	// #### subst :: *this* Term × string × Term → Term
 	// 替换一个变量名为一个其他形式。
 	/**
@@ -864,7 +855,7 @@ class Lit extends Term {
 	isAtomic() {
 		return true;
 	}
-	inspect() {
+	format() {
 		return this.lit + "";
 	}
 	/**
@@ -913,7 +904,7 @@ class Var extends Term {
 	isAtomic() {
 		return true;
 	}
-	inspect() {
+	format() {
 		return this.name;
 	}
 	/**
@@ -946,13 +937,12 @@ class App extends Term {
 		this.fn = fn;
 		this.arg = arg;
 	}
-	inspect() {
-		let l = util.inspect(this.fn);
-		let r = util.inspect(this.arg);
-
-		if (!this.arg.isAtomic()) {r = "(" + r + ")";}
-		if (!(this.fn.isAtomic() || this.fn instanceof App)) {l = "(" + l + ")";}
-		return l + ' ' + r;
+	format() {
+		if (this.fn instanceof App) {
+			return this.fn.format().concat([this.arg.format()]);
+		} else {
+			return [this.fn.format(), this.arg.format()];
+		}
 	}
 	betaRedex() {
 		this.fn = this.fn.betaRedex();
@@ -1012,8 +1002,8 @@ class Lam extends Term {
 		this.param = param;
 		this.body = body;
 	}
-	inspect() {
-		return "\\" + this.param + ". " + this.body.inspect();
+	format() {
+		return ["lambda".yellow.bold, this.param, this.body.format()];
 	}
 	betaRedex() {
 		this.body = this.body.betaRedex();
@@ -1070,8 +1060,8 @@ class ALam extends Term {
 		this.type = type;
 		this.body = body;
 	}
-	inspect() {
-		return "\\" + this.param + " : " + ( this.type.zonk().inspect()).blue + " . " + this.body.inspect();
+	format() {
+		return ["lambda".yellow.bold, ["::", this.param, this.type.zonk().format()], this.body.format()];
 	}
 	betaRedex() {
 		this.body = this.body.betaRedex();
@@ -1135,12 +1125,12 @@ class Let extends Term {
 		this.body = this.body.betaRedex();
 		return this;
 	}
-	inspect() {
-		return "let {" +
-		this.terms.map(({name, type, bind}) => (name
-			+ (type ? (" : " + type.zonk().inspect()).blue : "")
-			+ " = " + bind.inspect())).join("; ")
-		+ "} in " + this.body.inspect();
+	format() {
+		return ["let".yellow.bold].concat(
+			this.terms.map(({name, type, bind}) => type 
+				? ['=', ['::', name, type.format()], bind.format()] 
+				: ['=', name, bind.format()]),
+			[this.body.format()]);
 	}
 	/**
 	 * @param{string} id
@@ -1210,12 +1200,12 @@ class LetRec extends Term {
 		this.body = this.body.betaRedex();
 		return this;
 	}
-	inspect() {
-		return "let rec {" +
-		this.terms.map(({name, type, bind}) => (name
-			+ (type ? (" : " + type.zonk().inspect()).blue : "")
-			+ " = " + bind.inspect())).join("; ")
-		+ "} in " + this.body.inspect();
+	format() {
+		return ["letrec".yellow.bold].concat(
+			this.terms.map(({name, type, bind}) => type 
+				? ['=', ['::', name, type.format()], bind.format()] 
+				: ['=', name, bind.format()]),
+			[this.body.format()]);
 	}
 	/**
 	 * @param{string} id
@@ -1313,11 +1303,11 @@ class Ann extends Term {
 		}
 		return this;
 	}
-	inspect() {
+	format() {
 		if (this.body instanceof Var) {
-			return this.body.inspect() + (" as " + this.type.zonk().inspect()).blue;
+			return ["::", this.body.format(), this.type.zonk().format()];
 		} else {
-			return this.body.inspect();
+			return this.body.format();
 		}
 	}
 	subst(name, replacement) {
@@ -1374,11 +1364,11 @@ class GreatLambda extends Term {
 			return this;
 		}
 	}
-	inspect() {
+	format() {
 		if (this.quantifiers.length) {
-			return ("Λ{" + this.quantifiers.map(x => "'" + x).join(", ") + "}. ").red.bold + this.body.inspect();
+			return ["Λ".red.bold, this.quantifiers.map(x => new Slot(x).format()), this.body.format()];
 		} else {
-			return this.body.inspect();
+			return this.body.format();
 		}
 	}
 	/**
@@ -1402,8 +1392,8 @@ class Tag extends Term {
 	isAtomic() {
 		return true;
 	}
-	inspect() {
-		return ("<as " + this.type.zonk().inspect() + ">").yellow;
+	format() {
+		return ["as".red.bold, this.type.zonk().format()];
 	}
 }
 // ### System-F 显式类型实例化。$\mathrm{Inst}(\alpha\rightarrow\rho)=\lambda x.x^{\{\alpha=\rho\}}$
@@ -1419,13 +1409,13 @@ class Inst extends Term {
 	isAtomic() {
 		return true;
 	}
-	inspect() {
+	format() {
 		if (this.args.size) {
 			let buf = [];
 			for (let [k, v] of this.args) {
-				buf.push(new Slot(k).inspect() + " = " + v.zonk().inspect());
+				buf.push(['=', new Slot(k).format(), v.zonk().format()]);
 			}
-			return ("<inst " + buf.join(", ") + ">").green;
+			return ["inst".red.bold].concat(buf);
 		} else {
 			return "";
 		}
@@ -1442,7 +1432,7 @@ class CtorCoercion extends Term {
 	isAtomic() {
 		return true;
 	}
-	inspect() {
+	format() {
 		return ("<CTOR>").red;
 	}
 }
@@ -1453,7 +1443,7 @@ class ArgCoercion extends Term {
 	isAtomic() {
 		return true;
 	}
-	inspect() {
+	format() {
 		return ("<ARG>").cyan;
 	}
 }
@@ -1584,10 +1574,36 @@ const a = translate(
 			["&", ["strange", "id"], ["id_dyn", ["box_list", 1]]]]]
 );
 
+const COLORS = ['grey', 'blue', 'cyan'];
+function formatToStr(form, depth, infix) {
+	if (typeof form === "string") return form;
+	if (!infix && form.length === 3 && typeof form[0] === "string" && !/^[\wΛ]+$/.test(stripAnsi( form[0]))) {
+		return formatToStr([form[1], form[0].magenta, form[2]], depth, true);
+	}
+	const shorts = [];
+	let shortlen = 0;
+	for (let subform of form) {
+		shorts.push(formatToStr(subform, depth + 1, false));
+		shortlen += stripAnsi(shorts[shorts.length - 1]).length;
+	}
+	if (shortlen < 80) return (infix ? "(" : "[")[COLORS[depth % COLORS.length]] + shorts.join(" ") + (infix ? ")" : "]")[COLORS[depth % COLORS.length]];
+	else {
+		let buf = (infix ? "(" : "[")[COLORS[depth % COLORS.length]];
+		let lensofar = 0, indent = false;
+		for (let j = 0; j < shorts.length; j++) {
+			lensofar += stripAnsi(shorts[j]).length;
+			indent = indent || lensofar >= 80;
+			buf += ((indent && j) ? "\n" + "  ".repeat(depth) : " ") + shorts[j];
+		}
+		return buf + (infix ? ")" : "]")[COLORS[depth % COLORS.length]];
+	}
+}
+
+console.log("Program:", formatToStr(a.format(), 1, false));
 const {type, tagged} = a.inferSigma(env);
 // 应当返回：`(int * boolean) * list int`
-console.log("Type:", type);
+console.log("\nType:", formatToStr(type.format(), 1, false));
 // 应当返回：程序 a 的约制版本（非常长的）
-console.log("\nSystem F Notations: ", tagged);
+console.log("\nSystem F Notations: ", formatToStr(tagged.format(), 1, false));
 // 应当返回：程序 a 的约制版本，已规约的
-console.log("\nSystem F Redex: ", tagged.betaRedex());
+console.log("\nSystem F Redex: ", formatToStr(tagged.betaRedex().format(), 1, false));
