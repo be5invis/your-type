@@ -5,7 +5,7 @@
 
 
 
-
+const colors = require("colors");
 const util = require("util");
 
 // ## 第一部分，环境 $\Gamma$
@@ -63,6 +63,11 @@ class Environment {
 		this.uniqs.val += 1;
 		return this.uniqs.val;
 	}
+	// #### newVar :: *this* Environment → string
+	newVar(tag) {
+		this.uniqs.val += 1;
+		return (tag || "_") + this.uniqs.val;
+	}
 	// #### newMetaSlotVal :: *this* Environment → MetaSlotVal
 	// 生成新的 Meta slot value
 	newMetaSlotVal() {
@@ -89,7 +94,7 @@ class Environment {
 	 */
 	* getMetaSlotVars(tys) {
 		for (let type of tys) {
-			let type1 = type.zonk(this);
+			let type1 = type.zonk();
 			yield* type1.getMetaSlots();
 		}
 	}
@@ -100,7 +105,7 @@ class Environment {
 	 */
 	* getAllFreeSlots(tys) {
 		for (let type of tys) {
-			let type1 = type.zonk(this);
+			let type1 = type.zonk();
 			yield* type1.getFreeSlots();
 		}
 	}
@@ -182,23 +187,31 @@ class Type {
 	// 在环境 env 中，实例化当前的多态类型。它会去除顶层的 $\forall$ 符号。
 	/**
 	 * @param {Environment} env
-	 * @returns {Type}
+	 * @returns {{type: Type, coercion: Term}}
 	 */
 	instantiate(env) {
-		return this;
+		const x = env.newVar();
+
+		return {
+			type: this,
+			coercion: new Tag(this)
+		};
 	}
-	// #### skolmeize :: *this* Type × Environment → {map: Map string Slot, type: Type}
-	// 在当前环境 env 中，产生当前类型的一个斯科伦范式形式。它可以看作实例化的递归版本，会展开每一层的多态，同时会返回新产生的临时变量的表（这里使用一个名字到 Slot 的 Map 实现）。我们不会展开复合类型的前件，避免错误地捕捉变量。此过程产生的类型必然保证：所有符合构造的后件不包含任何的多态。
+	// #### skolmeize :: *this* Type × Environment → {map: Map string Slot, type: Type, coercion: Coercion}
+	// 在当前环境 env 中，产生当前类型的一个斯科伦范式形式。它可以看作实例化的递归版本，会展开每一层的多态，同时会返回新产生的临时变量的表（这里使用一个名字到 Slot 的 Map 实现），以及一个约制项。我们不会展开复合类型的前件，避免错误地捕捉变量。此过程产生的类型必然保证：所有复合类型的协变端不包含任何的多态。
 	// 
 	// 一个实例是：$\mathrm{skol}(\forall a.a\rightarrow(\forall b.b\rightarrow b))=\forall ab. a \rightarrow (b \rightarrow b)$
 	/**
 	 * @param {Environment} env
-	 * @returns {{map: Map<string, Slot>, type: Type}}
+	 * @returns {{map: Map<string, Slot>, type: Type, coercion: Term}}
 	 */
 	skolmeize(env) {
+		const x = env.newVar();
+
 		return {
 			map: new Map(),
-			type: this
+			type: this,
+			coercion: new Tag(this)
 		};
 	}
 	// #### generalize :: *this* Type × Environment × [MetaSlotVal] → ForAll
@@ -217,49 +230,50 @@ class Type {
 			slot.typeRef.val = newBinder;
 			newBinders.push(newBinder);
 		}
-		return new ForAll(newBinders.map(x => x.name), this.zonk(env));
+		return new ForAll(newBinders.map(x => x.name), this.zonk());
 	}
 	// #### zonk :: *this* Type × Environment → Type
 	// 消除掉当前类型中所有的 Meta Slot。
 	/**
-	 * @param {Environment} env
 	 * @returns {Type}
 	 */
-	zonk(env) {
+	zonk() {
 		return this;
 	}
-	// #### instSigmaInfer :: *this* Type × Environment → Type
-	// 在类型推理时，生成一个实例化的版本
+	// #### instSigmaInfer :: *this* Type × Environment → {type: Type, coercion: Coercion}
+	// 在类型推理时，生成一个实例化的版本和对应的约制项。
 	//
 	// INFER-INST: $\dfrac{}{\forall \overline a. \rho \le \sim [\overline{a\rightarrow\mathrm{fresh}}]\rho}$
 	/**
 	 * @param{Environment} env
-	 * @returns{Type}
+	 * @returns {{type: Type, coercion: Term}}
 	 */
 	instSigmaInfer(env) {
 		return this.instantiate(env);
 	}
-	// #### instSigmaCheck :: *this* Type × Environment × Type → boolean
-	// 在类型推理时，检查本类型是否符合需求
+	// #### instSigmaCheck :: *this* Type × Environment × Type → Coercion
+	// 在类型推理时，检查本类型是否符合需求，返回一个约制项
 	/**
 	 * @param{Environment} env
 	 * @param{Type} expected
+	 * @returns{Term}
 	 */
 	instSigmaCheck(env, expected) {
 		return this.subsCheckRho(env, expected);
 	}
-	// #### subsCheck :: *this* Type × Environment × Type → boolean <br> subsCheckRho :: *this* Type × Environment × Type → boolean
-	// 判断某个类型是否比另一个类型更加「泛化」。
+	// #### subsCheck :: *this* Type × Environment × Type → Coercion <br> subsCheckRho :: *this* Type × Environment × Type → Coercion
+	// 判断某个类型是否比另一个我们期待的类型更加「泛化」。返回一个约制项。
 	// 我们把它拆分成两个部分：$\rm subsCheck$ 和 $\rm subsCheckRho$，前者处理两个 $\sigma$ 类型，后者处理一个 $\sigma$ 类型和一个 $\rho$ 类型。
 	/**
 	 * @param{Environment} env
 	 * @param{Type} that
+	 * @returns{Term}
 	 */
 	subsCheck(env, that) {
 		// $\sigma_1 \le \sigma_2$ 成立，当且仅当：
-		const {map: skolTvs, type: rho2} = that.skolmeize(env);
+		const {map: skolTvs, type: rho2, coercion: f1} = that.skolmeize(env);
 		//  - $\sigma_1 \le \rho, \forall \overline a. \rho = \mathrm{skol}(\sigma_2)$
-		this.subsCheckRho(env, rho2);
+		const f2 = this.subsCheckRho(env, rho2);
 		//  - 并且，$\sigma_1$ 的自由变量中，$\sigma_2$ 中的对应者没有被「提出来」
 		//    
 		//    $\overline a \not\in \mathrm{free}(\sigma_1)$
@@ -269,30 +283,43 @@ class Type {
 				throw "Subsumption check failed"
 			}
 		}
+
+		const x = env.newVar();
+		return new ALam(x, this, new App(f1, new GreatLambda(
+			Array.from(skolTvs.keys()),
+			new App(f2, new Var(x)))));
 	}
 	// ${\rm subsCheckRho}(\sigma, \rho)$ 将会检查是否 $\sigma$ 比 $\rho$ 更加泛化（$\sigma\le\rho$）。
 	/**
 	 * @param{Environment} env
 	 * @param{Type} that
+	 * @returns{Term}
 	 */
 	subsCheckRho(env, that) {
 		if (that instanceof Composite) {
 			const [f1, a1] = unifyComposite(this, env);
 			return subsCheckComposite(env, that.contravariant, f1, that.fn, a1, that.arg);
 		} else {
-			return unify(this, that);
+			unify(this, that);
+			return new Tag(this);
 		}
 	}
 }
 
-// #### subsCheckComposite :: Environment × boolean × Type × Type × Type × Type → boolean
+// #### subsCheckComposite :: Environment × boolean × Type × Type × Type × Type → Coercion
 // 复合类型的小前提检查，注意反变性。在这里我们限制任何复合类型的构造器部分是**非变**的，这样可以降低复杂性。对于协/反变性的更精细处理可以递归展开 f1/f2 的部分，然后分别处理每个参数。
 function subsCheckComposite(env, contravariant, f1, f2, a1, a2) {
-	f1.subsCheck(env, f2);
+	const tagf1 = f1.subsCheck(env, f2);
+	let tagf2;
 	if (contravariant) {
-		a2.subsCheck(env, a1);
+		tagf2 = a2.subsCheck(env, a1);
+		const x = env.newVar("x");
+		const y = env.newVar("y");
+		return new Tag(new Composite(f1, a1))
 	} else {
-		a1.subsCheckRho(env, a2);
+		tagf2 = a1.subsCheckRho(env, a2);
+		const z = env.newVar("z");
+		return new Tag(new Composite(f1, a1))
 	}
 }
 
@@ -415,27 +442,36 @@ class Composite extends Type {
 	}
 	// 复合类型的斯科伦化需要小心地处理其参数部分：
 	skolmeize(env) {
-		let {map: m1, type: t1} = this.fn.skolmeize(env);
+		let {map: m1, type: t1, coercion: f1} = this.fn.skolmeize(env);
+		const x = env.newVar("SK-X");
 		if (this.contravariant) {
 			//   - 如果这个类型是反变的，保留其 arg 部分；
+			const skolRho = new Composite(t1, this.arg, this.contravariant);
 			return {
 				map: m1,
-				type: new Composite(t1, this.arg, this.contravariant)
+				type: skolRho,
+				coercion: new ALam(x, new ForAll(m1, skolRho),
+					new GreatLambda(Array.from(m1.keys()),
+						new Var(x)))
 			};
 		} else {
 			//   - 如果这个类型是协变的，展开其 arg 部分。
-			let {map: m2, type: t2} = this.arg.skolmeize(env);
+			let {map: m2, type: t2, coercion: f2} = this.arg.skolmeize(env);
 			for (let [k, v] of m1.entries()) {
 				m2.set(k, v);
 			}
+			const skolRho = new Composite(t1, t2, this.contravariant);
 			return {
 				map: m2,
-				type: new Composite(t1, t2, this.contravariant)
+				type: skolRho,
+				coercion: new ALam(x, new ForAll(m2, skolRho),
+					new App(f2, new GreatLambda(Array.from(m2.keys()),
+						new Var(x))))
 			};
 		}
 	}
-	zonk(env) {
-		return new Composite(this.fn.zonk(env), this.arg.zonk(env), this.contravariant);
+	zonk() {
+		return new Composite(this.fn.zonk(), this.arg.zonk(), this.contravariant);
 	}
 	/**
 	 * @param{Environment} env
@@ -495,7 +531,12 @@ class ForAll extends Type {
 		for (let q of this.quantifiers) {
 			m.set(q, new MetaSlot(env.newMetaSlotVal()));
 		}
-		return this.body.subst(m);
+		const rho = this.body.subst(m);
+		const x = env.newVar();
+		const coercion = new ALam(x, this, new App(new Inst(m), new Var(x)));
+		return {
+			type: rho, coercion: coercion
+		};
 	}
 	// 多态类型的深斯科伦化会合并内外两层的变量表。
 	/**
@@ -510,25 +551,33 @@ class ForAll extends Type {
 			m.set(sv, ss);
 			mSub.set(q, ss);
 		}
-		let {map: m1, type: t1} = this.body.subst(mSub).skolmeize(env);
-		for (let [k, v] of m1.entries()) {
-			m.set(k, v);
+		let {map: m1, type: t1, coercion: f} = this.body.subst(mSub).skolmeize(env);
+		for (let [k, v] of m.entries()) {
+			m1.set(k, v);
 		}
+		const x = env.newVar();
 		return {
-			map: m,
-			type: t1
+			map: m1,
+			type: t1,
+			coercion: new ALam(x,
+				new ForAll(m1, t1),
+				new GreatLambda(Array.from(m1.keys()),
+					new App(f, new Var(x))))
 		};
 	}
 
-	zonk(env) {
-		return new ForAll(this.quantifiers, this.body.zonk(env));
+	zonk() {
+		return new ForAll(this.quantifiers, this.body.zonk());
 	}
 	/**
 	 * @param{Environment} env
 	 * @param{Type} that
 	 */
 	subsCheckRho(env, that) {
-		return this.instantiate(env).subsCheckRho(env, that);
+		let {type:rho1, coercion:t1} = this.instantiate(env);
+		const f = rho1.subsCheckRho(env, that);
+		const x = env.newVar();
+		return new ALam(x, this, new App(f, new App(t1.body.fn, new Var(x))));
 	}
 }
 
@@ -542,16 +591,16 @@ class MetaSlot extends Type {
 		this.arg = arg;
 	}
 	inspect() {
-		return "?" + this.arg.id;
+		return ("?" + this.arg.id).red.bold;
 	}
 	_getMetaSlots(a) {
 		if (!a.has(this.arg.id)) {
 			a.set(this.arg.id, this.arg);
 		}
 	}
-	zonk(env) {
+	zonk() {
 		if (this.arg.typeRef.val) {
-			let t1 = this.arg.typeRef.val.zonk(env);
+			let t1 = this.arg.typeRef.val.zonk();
 			this.arg.typeRef.val = t1;
 			return t1;
 		} else {
@@ -697,30 +746,46 @@ function unifyComposite(type, env) {
 
 // ## 第四部分，主推理算法
 // 由于高阶类型的介入，Damas-Hindley-Milner 系统中的单一「推理」方法需要拆分为一对方法，`infer` 和 `check`；它们会再根据所处理的类型（$\sigma$ 或者 $\rho$ 类型），再各自进行拆分，因此最终得到四个方法：`inferRho`, `checkRho`, `inferSigma`, `checkSigma`。
+//
+// 在进行类型检查的时候，我们还会把当前项用一个约制（Coercion）项包装，我们称这种表达式是标记的（Tagged）。约制项目是一个合法的 System F 函数，它会显式标注所有的多态抽象和实例化过程。所有的约制项经过 $\beta$ 规约之后可以达到「给普通函数加类型标注」一样的效果。
 class Term {
 	constructor() {}
-	isAtomic() {
-		return false;
+	inspect() {}
+	// #### subst :: *this* Term × string × Term → Term
+	// 替换一个变量名为一个其他形式。
+	/**
+	 * @param{string} id
+	 * @param{Term} replacement
+	 * @returns{Term}
+	 */
+	subst(id, replacement) {
+		return this;
 	}
-	// #### checkRho :: *this* Term × Environment × Type → boolean
+	// #### betaRedex :: *this* Term → Term
+	// 进行 $\beta$ 规约。此过程主要用于清理约制项，将他们并入程序中。
+	betaRedex() {
+		return this;
+	}
+	// #### checkRho :: *this* Term × Environment × Type → Tagged
 	// 在环境 env 中检查当前表达式是否符合 $\rho$ 类型 type
 	//
 	// $\Gamma\vdash t : \rho$
 	/**
 	 * @param {Environment} env
 	 * @param {Type} type
+	 * @returns {Term}
 	 */
 	_checkRho(env, type) {}
 	checkRho(env, type) {
 		return this._checkRho(env, type);
 	}
-	// #### inferRho :: *this* Term × Environment → Type
+	// #### inferRho :: *this* Term × Environment → {type: Type, tagged: Tagged}
 	// 在环境 env 中推理，尝试得到 $\rho$ 类型（或者报错）
 	//
 	// $\Gamma\vdash t :\sim \rho$
 	/**
 	 * @param {Environment} env
-	 * @returns {Type}
+	 * @returns {{tagged: Term, type: Type}}
 	 */
 	_inferRho(env) {}
 	inferRho(env) {
@@ -729,17 +794,18 @@ class Term {
 		return t;
 	}
 
-	// #### checkSigma :: *this* Term × Environment × Type → boolean
-	// 在环境 env 中检查当前表达式是否符合 $\sigma$ 类型 type
+	// #### checkSigma :: *this* Term × Environment × Type → Tagged
+	// 在环境 env 中检查当前表达式是否符合 $\sigma$ 类型 type。返回一个带 $Lambda$ 的约制。
 	//
 	// CHECK-SIGMA: $\dfrac{\overline a \not\in \mathrm{free}(\Gamma)\quad \Gamma\vdash t:\rho\quad \forall\overline a.\rho = \mathrm{skol}(\sigma)}{\Gamma\vdash^* t:\sigma}$
 	/**
-	 * @param{Environment} env
-	 * @param{Type} sigma
+	 * @param {Environment} env
+	 * @param {Type} sigma
+	 * @returns {Term}
 	 */
 	checkSigma(env, type) {
-		const {map: mvs, type: rho} = type.skolmeize(env);
-		this.checkRho(env, rho);
+		const {map: mvs, type: rho, coercion: f} = type.skolmeize(env);
+		const e = this.checkRho(env, rho);
 		const envTys = env.getTypes();
 		const escTvs = new Set(env.getAllFreeSlots(envTys));
 		for (let [name, slot] of mvs) {
@@ -747,26 +813,30 @@ class Term {
 				throw "Type is not polymorphic enough"
 			}
 		}
-		return true;
+		return new App(f, new GreatLambda(mvs, e));
 	}
 
-	// #### inferSigma :: *this* Term × Environment → Type
-	// 在环境 env 中推理，尝试得到 $\sigma$ 类型（或者报错）
+	// #### inferSigma :: *this* Term × Environment → {type: Type, tagged: Tagged}
+	// 在环境 env 中推理，尝试得到 $\sigma$ 类型（或者报错）以及对应的带 $Lambda$ 的约制。
 	//
 	// INFER-SIGMA: $\dfrac{\overline a = \mathrm{free}(\rho)-\mathrm{free}(\Gamma)\quad \Gamma\vdash t:\sim \rho}{\Gamma\vdash^* t:\sim\forall\overline a.\rho}$
 	/**
 	 * @param{Environment} env
-	 * @returns{Type}
+	 * @returns {{tagged: Term, type: Type}}
 	 */
 	inferSigma(env) {
-		const expTy = this.inferRho(env);
+		const {type: expTy, tagged} = this.inferRho(env);
 		const envTys = env.getTypes();
 		const envMsvs = env.getMetaSlotVars(envTys);
 		const resMsvs = new Map(env.getMetaSlotVars([expTy]));
 		for (let [id, v] of envMsvs) {
 			resMsvs.delete(id);
 		}
-		return expTy.generalize(env, Array.from(resMsvs.values()));
+		const polyTy = expTy.generalize(env, Array.from(resMsvs.values()));
+		return {
+			type: polyTy,
+			tagged: new GreatLambda(polyTy.quantifiers, tagged)
+		};
 	}
 }
 // ### 直接量
@@ -778,31 +848,40 @@ class Lit extends Term {
 		super();
 		this.lit = n;
 	}
-	isAtomic() {
-		return true;
+	inspect() {
+		return this.lit + "";
+	}
+	/**
+	 * @param{string} id
+	 * @param{Term} replacement
+	 * @returns{Term}
+	 */
+	subst(id, replacement) {
+		return this;
 	}
 	// CHECK-LIT: $\dfrac{}{\Gamma\vdash \iota:\mathrm{literalTypeOf}(\iota)}$
 	_checkRho(env, exp) {
 		if (typeof this.lit === "number") {
-			return new Primitive("int").instSigmaCheck(env, exp);
+			new Primitive("int").instSigmaCheck(env, exp);
 		} else if (typeof this.lit === "string") {
-			return new Primitive("str").instSigmaCheck(env, exp);
+			new Primitive("str").instSigmaCheck(env, exp);
 		} else if (typeof this.lit === "boolean") {
-			return new Primitive("boolean").instSigmaCheck(env, exp);
+			new Primitive("boolean").instSigmaCheck(env, exp);
 		} else {
-			return new Primitive("unit").instSigmaCheck(env, exp);
+			new Primitive("unit").instSigmaCheck(env, exp);
 		}
+		return this;
 	}
 	// INFER-LIT: $\dfrac{}{\Gamma\vdash \iota:\sim\mathrm{literalTypeOf}(\iota)}$
 	_inferRho(env) {
 		if (typeof this.lit === "number") {
-			return new Primitive("int").instSigmaInfer(env);
+			return {type: new Primitive("int").instSigmaInfer(env).type, tagged: this};
 		} else if (typeof this.lit === "string") {
-			return new Primitive("str").instSigmaInfer(env);
+			return {type: new Primitive("str").instSigmaInfer(env).type, tagged: this};
 		} else if (typeof this.lit === "boolean") {
-			return new Primitive("boolean").instSigmaInfer(env);
+			return {type: new Primitive("boolean").instSigmaInfer(env).type, tagged: this};
 		} else {
-			return new Primitive("unit").instSigmaInfer(env);
+			return {type: new Primitive("unit").instSigmaInfer(env).type, tagged: this};
 		}
 	}
 }
@@ -815,16 +894,26 @@ class Var extends Term {
 		super();
 		this.name = name;
 	}
-	isAtomic() {
-		return true;
+	inspect() {
+		return this.name;
+	}
+	/**
+	 * @param{string} id
+	 * @param{Term} replacement
+	 * @returns{Term}
+	 */
+	subst(id, replacement) {
+		if (id === this.name) return replacement; else return this;
 	}
 	// CHECK-VAR: $\dfrac{\sigma\le\rho}{\Gamma, x:\sigma\vdash x:\rho}$
 	_checkRho(env, expected) {
-		return env.lookup(this.name).instSigmaCheck(env, expected);
+		const f = env.lookup(this.name).instSigmaCheck(env, expected);
+		return new App(f, this);
 	}
 	// INFER-VAR: $\dfrac{\sigma\le\sim\rho}{\Gamma, x:\sigma\vdash x:\sim\rho}$
 	_inferRho(env) {
-		return env.lookup(this.name).instSigmaInfer(env);
+		const {type, coercion: f} = env.lookup(this.name).instSigmaInfer(env);
+		return {type, tagged: new App(f, this)};
 	}
 }
 // ### 函数调用
@@ -838,19 +927,51 @@ class App extends Term {
 		this.fn = fn;
 		this.arg = arg;
 	}
+	inspect() {
+		if (this.arg instanceof Lit || this.arg instanceof Var) {
+			return util.inspect(this.fn) + " " + this.arg.inspect();
+		} else {
+			return util.inspect(this.fn) + " (" + this.arg.inspect() + ")";
+		}
+	}
+	betaRedex() {
+		this.fn = this.fn.betaRedex();
+		this.arg = this.arg.betaRedex();
+		while(this.fn instanceof Ann){
+			this.fn = this.fn.body;
+		}
+		if (this.fn instanceof Tag) {
+			return this.arg;
+		} else if (this.fn instanceof ALam) {
+			return this.fn.body.subst(this.fn.param, new Ann(this.arg, this.fn.type)).betaRedex();
+		} else {
+			return this;
+		}
+	}
+	/**
+	 * @param{string} id
+	 * @param{Term} replacement
+	 * @returns{Term}
+	 */
+	subst(id, replacement) {
+		return new App(this.fn.subst(id, replacement),
+			this.arg.subst(id, replacement));
+	}
 	// CHECK-APP: $\dfrac{\Gamma\vdash t:\sim(\sigma \rightarrow \sigma')\quad \Gamma\vdash^*u:\sigma\quad \sigma'\le\rho'}{\Gamma\vdash t\ u : \rho}$
 	_checkRho(env, expected) {
-		const funTy = this.fn.inferRho(env);
+		const {type: funTy, tagged: e1} = this.fn.inferRho(env);
 		const [argTy, resTy] = unifyFun(funTy, env);
-		this.arg.checkSigma(env, argTy);
-		return resTy.instSigmaCheck(env, expected);
+		const e2 = this.arg.checkSigma(env, argTy);
+		const f = resTy.instSigmaCheck(env, expected);
+		return new App(f, new App(e1, e2));
 	}
 	// INFER-APP: $\dfrac{\Gamma\vdash t:\sim(\sigma \rightarrow \sigma')\quad\Gamma\vdash^* u:\sigma\quad \sigma'\le\sim\rho'}{\Gamma\vdash t\ u :\sim \rho}$
 	_inferRho(env) {
-		const funTy = this.fn.inferRho(env);
+		const {type: funTy, tagged: e1} = this.fn.inferRho(env);
 		const [argTy, resTy] = unifyFun(funTy, env);
-		this.arg.checkSigma(env, argTy);
-		return resTy.instSigmaInfer(env);
+		const e2 = this.arg.checkSigma(env, argTy);
+		const {type: t, coercion: f} = resTy.instSigmaInfer(env);
+		return {type: t, tagged: new App(f, new App(e1, e2))};
 	}
 }
 // ### 函数抽象
@@ -864,6 +985,25 @@ class Lam extends Term {
 		this.param = param;
 		this.body = body;
 	}
+	inspect() {
+		return "(\\" + this.param + ". " + this.body.inspect() + ")";
+	}
+	betaRedex() {
+		this.body = this.body.betaRedex();
+		return this;
+	}
+	/**
+	 * @param{string} id
+	 * @param{Term} replacement
+	 * @returns{Term}
+	 */
+	subst(id, replacement) {
+		if (id != this.param) {
+			return new Lam(this.param, this.body.subst(id, replacement));
+		} else {
+			return this;
+		}
+	}
 	// CHECK-LAM: $\dfrac{\Gamma, x:\sigma_x\vdash^* t:\sigma_t}{\Gamma\vdash(\lambda\ x.t):\sigma_x\rightarrow\sigma_t}$
 	/**
 	 * @param{Environment} env
@@ -872,7 +1012,8 @@ class Lam extends Term {
 	_checkRho(env, expected) {
 		const [varTy, bodyTy] = unifyFun(expected, env);
 		const env1 = env.extend(this.param, varTy);
-		return this.body.checkRho(env1, bodyTy); // bodyTy is always a Rho-type.
+		const e = this.body.checkRho(env1, bodyTy); // bodyTy is always a Rho-type.
+		return new ALam(this.param, varTy, e);
 	}
 	// INFER-LAM: $\dfrac{\Gamma, x:\tau\vdash t:\sim\rho}{\Gamma\vdash(\lambda\ x.t):\sim\tau\rightarrow\rho}$
 	/**
@@ -882,8 +1023,11 @@ class Lam extends Term {
 	_inferRho(env) {
 		const varTy = new MetaSlot(env.newMetaSlotVal());
 		const env1 = env.extend(this.param, varTy);
-		const bodyTy = this.body.inferRho(env1);
-		return FunctionType(varTy, bodyTy);
+		const {type: bodyTy, tagged: e} = this.body.inferRho(env1);
+		return {
+			type: FunctionType(varTy, bodyTy),
+			tagged: new ALam(this.param, varTy, e)
+		};
 	}
 }
 // ### 标记了参数类型的函数抽象
@@ -899,6 +1043,25 @@ class ALam extends Term {
 		this.type = type;
 		this.body = body;
 	}
+	inspect() {
+		return "(\\" + this.param + (":" + this.type.zonk().inspect()).blue + ". " + this.body.inspect() + ")";
+	}
+	betaRedex() {
+		this.body = this.body.betaRedex();
+		return this;
+	}
+	/**
+	 * @param{string} id
+	 * @param{Term} replacement
+	 * @returns{Term}
+	 */
+	subst(id, replacement) {
+		if (id != this.param) {
+			return new ALam(this.param, this.type, this.body.subst(id, replacement));
+		} else {
+			return this;
+		}
+	}
 	// CHECK-ALAM: $\dfrac{\sigma_a\le\sigma_x\quad\Gamma, x:\sigma_x\vdash^* t:\sigma_t}{\Gamma\vdash(\lambda(x:\sigma_x).t):\sigma_a\rightarrow\sigma_t}$
 	/**
 	 * @param{Environment} env
@@ -906,9 +1069,11 @@ class ALam extends Term {
 	 */
 	_checkRho(env, expected) {
 		const [varTy, bodyTy] = unifyFun(expected, env);
-		varTy.subsCheck(this.type);
+		const f = varTy.subsCheck(this.type);
 		const env1 = env.extend(this.param, varTy);
-		return this.body.checkRho(env1, bodyTy);
+		const e = this.body.checkRho(env1, bodyTy);
+		return new ALam(this.param, varTy,
+			e.subst(this.param, new App(f, new Var(this.param))));
 	}
 	// INFER-ALAM: $\dfrac{\Gamma, x:\sigma\vdash t:\sim\rho}{\Gamma\vdash(\lambda(x:\sigma).t):\sim\sigma\rightarrow\rho}$
 	/**
@@ -917,10 +1082,14 @@ class ALam extends Term {
 	 */
 	_inferRho(env) {
 		const env1 = env.extend(this.param, this.type);
-		const bodyTy = this.body.inferRho(env1);
-		return FunctionType(this.type, bodyTy);
+		const {type: bodyTy, tagged: e} = this.body.inferRho(env1);
+		return {
+			type: FunctionType(this.type, bodyTy),
+			tagged: new ALam(this.param, this.type, e)
+		};
 	}
 }
+
 // ### 非递归 Let 绑定
 class Let extends Term {
 	/**
@@ -932,15 +1101,49 @@ class Let extends Term {
 		this.terms = terms;
 		this.body = body;
 	}
+	betaRedex() {
+		for (let term of this.terms) {
+			term.bind = term.bind.betaRedex();
+		}
+		this.body = this.body.betaRedex();
+		return this;
+	}
+	inspect() {
+		return "let {" +
+		this.terms.map(({name, type, bind}) => (name
+			+ (type ? (":" + type.zonk().inspect()).blue : "")
+			+ " = " + bind.inspect())).join("; ")
+		+ "} in " + this.body.inspect();
+	}
+	/**
+	 * @param{string} id
+	 * @param{Term} replacement
+	 * @returns{Term}
+	 */
+	subst(id, replacement) {
+		let terms1 = [];
+		let overrided = false;
+		for (let {name, bind} of this.terms) {
+			if (name === id) overrided = true;
+			terms1.push({name, bind: bind.subst(id, replacement)});
+		}
+		return new Let(terms1, !overrided ? this.body.subst(id, replacement) : this.body);
+	}
 	// CHECK-LET: $\dfrac{\Gamma\vdash^* t: \sigma'\quad \Gamma, x:\sigma'\vdash u:\rho}{\Gamma\vdash(\mathbf{let}\ (x=t).u):\rho}$
 	/**
 	 * @param{Environment} env
 	 * @param{Type} expected
 	 */
 	_checkRho(env, expected) {
-		const varTys = this.terms.map(({name, bind}) => ({name, type: bind.inferSigma(env)}));
+		const varTys = this.terms.map(function ({name, bind}) {
+			const {type, tagged} = bind.inferSigma(env);
+			return {name, type, tagged};
+		});
 		const env1 = env.extendN(varTys);
-		return this.body.checkRho(env1, expected);
+		const ebody = this.body.checkRho(env1, expected);
+		return new Let(
+			varTys.map(x => ({name: x.name, bind: x.tagged, type: x.type})),
+			ebody);
 	}
 	// INFER-LET: $\dfrac{\Gamma\vdash^* t:\sim \sigma'\quad \Gamma, x:\sigma'\vdash u:\sim\rho}{\Gamma\vdash(\mathbf{let}\ (x=t).u):\sim\rho}$
 	/**
@@ -948,9 +1151,18 @@ class Let extends Term {
 	 * @returns{Type} 
 	 */
 	_inferRho(env) {
-		const varTys = this.terms.map(({name, bind}) => ({name, type: bind.inferSigma(env)}));
+		const varTys = this.terms.map(function ({name, bind}) {
+			const {type, tagged} = bind.inferSigma(env);
+			return {name, type, tagged};
+		});
 		const env1 = env.extendN(varTys);
-		return this.body.inferRho(env1);
+		const {type: t, tagged: ebody} = this.body.inferRho(env1);
+		return {
+			type: t,
+			tagged: new Let(
+				varTys.map(x => ({name: x.name, bind: x.tagged, type: x.type})),
+				ebody)
+		};
 	}
 }
 // ### 递归 Let 绑定
@@ -963,6 +1175,42 @@ class LetRec extends Term {
 		super();
 		this.terms = terms;
 		this.body = body;
+	}
+	betaRedex() {
+		for (let term of this.terms) {
+			term.bind = term.bind.betaRedex();
+		}
+		this.body = this.body.betaRedex();
+		return this;
+	}
+	inspect() {
+		return "let rec {" +
+		this.terms.map(({name, type, bind}) => (name
+			+ (type ? (":" + type.zonk().inspect()).blue : "")
+			+ " = " + bind.inspect())).join("; ")
+		+ "} in " + this.body.inspect();
+	}
+	/**
+	 * @param{string} id
+	 * @param{Term} replacement
+	 * @returns{Term}
+	 */
+	subst(id, replacement) {
+		let overrided = false;
+		for (let {name, bind, type} of this.terms) {
+			if (name === id) {
+				overrided = true;
+			}
+		}
+		let terms1 = [];
+		for (let {name, bind, type} of this.terms) {
+			if (overrided) {
+				terms1.push({name, bind, type});
+			} else {
+				terms1.push({name, bind: bind.subst(id, replacement), type});
+			}
+		}
+		return new LetRec(terms1, !overrided ? this.body.subst(id, replacement) : this.body);
 	}
 	// CHECK-LETREC1: $\dfrac{\Gamma, x:\mathrm{fresh}\vdash^* t: \sigma'\quad \Gamma, x:\sigma'\vdash u:\rho}{\Gamma\vdash(\mathbf{let\ rec}\ (x=t).u):\rho}$
 	// 
@@ -977,9 +1225,15 @@ class LetRec extends Term {
 			type: type || new MetaSlot(env.newMetaSlotVal())
 		}));
 		const env1 = env.extendN(env1TypeBindings);
-		const varTys = this.terms.map(({name, bind}) => ({name, type: bind.inferSigma(env1)}));
+		const varTys = this.terms.map(function ({name, bind}) {
+			const {type, tagged} = bind.inferSigma(env1);
+			return {name, type, tagged};
+		});
 		const env2 = env.extendN(varTys);
-		return this.body.checkRho(env2, expected);
+		const ebody = this.body.checkRho(env2, expected);
+		return new LetRec(
+			varTys.map(x => ({name: x.name, bind: x.tagged, type: x.type})),
+			ebody);
 	}
 	// INFER-LETREC1: $\dfrac{\Gamma, x:\mathrm{fresh}\vdash^* t:\sim \sigma'\quad \Gamma, x:\sigma'\vdash u:\sim\rho}{\Gamma\vdash(\mathbf{let\ rec}\ (x=t).u):\sim\rho}$
 	//
@@ -995,14 +1249,23 @@ class LetRec extends Term {
 		}));
 		const env1 = env.extendN(env1TypeBindings);
 		const varTys = this.terms.map(({name, bind, type}) => {
-			const inferredType = bind.inferSigma(env1);
-			if (type) {
-				type.subsCheck(env, inferredType);
+			const {type:inferredType, tagged:e} = bind.inferSigma(env1);
+			let f = type ? type.subsCheck(env, inferredType) : null;
+			if (f) {
+				return {name, type: inferredType,
+				tagged: e.subst(name, new App(f, new Var(name)))};
+			} else {
+				return {name, type: inferredType, tagged: e};
 			}
-			return {name, type: inferredType};
 		});
 		const env2 = env.extendN(varTys);
-		return this.body.inferRho(env2);
+		const {type: t, tagged: ebody} = this.body.inferRho(env2);
+		return {
+			type: t,
+			tagged: new LetRec(
+				varTys.map(x => ({name: x.name, bind: x.tagged, type: x.type})),
+				ebody)
+		};
 	}
 }
 // ### 显式窄化
@@ -1013,8 +1276,25 @@ class Ann extends Term {
 	 */
 	constructor(body, type) {
 		super();
-		this.type = type;
 		this.body = body;
+		this.type = type;
+	}
+	betaRedex() {
+		this.body = this.body.betaRedex();
+		while(this.body instanceof Ann){
+			this.body = this.body.body;
+		}
+		return this;
+	}
+	inspect() {
+		if (this.body instanceof Var) {
+			return this.body.inspect() + (" as " + this.type.zonk().inspect()).blue;
+		} else {
+			return this.body.inspect();
+		}
+	}
+	subst(name, replacement) {
+		return new Ann(this.body.subst(name, replacement), this.type);
 	}
 	// CHECK-ANN: $\dfrac{\Gamma\vdash^* t:\sigma \quad \sigma\le\rho}{\Gamma\vdash(t:\sigma):\rho}$
 	/**
@@ -1022,8 +1302,9 @@ class Ann extends Term {
 	 * @param{Type} expected
 	 */
 	_checkRho(env, expected) {
-		this.body.checkSigma(env, this.type);
-		return this.type.instSigmaCheck(env, expected);
+		const e = this.body.checkSigma(env, this.type);
+		const f = this.type.instSigmaCheck(env, expected);
+		return new App(f, e);
 	}
 	// INFER-ANN: $\dfrac{\Gamma\vdash^* t:\sigma \quad \sigma\le\sim\rho}{\Gamma\vdash(t:\sigma):\sim\rho}$
 	/**
@@ -1031,8 +1312,86 @@ class Ann extends Term {
 	 * @returns{Type}
 	 */
 	_inferRho(env) {
-		this.body.checkSigma(env, this.type);
-		return this.type.instSigmaInfer(env);
+		const e = this.body.checkSigma(env, this.type);
+		const {type, coercion:f} = this.type.instSigmaInfer(env);
+		return {type, tagged: new App(f, e)};
+	}
+}
+// 以下的项目为 System F 的高阶构造，它们主要用于构造约制子。
+// 
+// ### System-F 类型抽象，$\Lambda$
+class GreatLambda extends Term {
+	/**
+	 * @param {Array<Slot>} quantifiers
+	 * @param {Term} body
+	 */
+	constructor(quantifiers, body) {
+		super();
+		this.quantifiers = quantifiers;
+		this.body = body;
+	}
+	betaRedex() {
+		this.body = this.body.betaRedex();
+		while(this.body instanceof Ann){
+			this.body = this.body.body;
+		}
+		if (!this.quantifiers.length) {
+			return this.body;
+		} else if (this.body instanceof GreatLambda) {
+			const s = new Set(this.body.quantifiers);
+			for (let k of this.quantifiers) {
+				s.add(k);
+			}
+			return new GreatLambda(Array.from(s), this.body.body);
+		} else {
+			return this;
+		}
+	}
+	inspect() {
+		if (this.quantifiers.length) {
+			return "(" + ("Λ{" + this.quantifiers.join(" ") + "}. ").red + this.body.inspect() + ")";
+		} else {
+			return this.body.inspect();
+		}
+	}
+	/**
+	 * @param{string} id
+	 * @param{Term} replacement
+	 * @returns{Term}
+	 */
+	subst(id, replacement) {
+		return new GreatLambda(this.quantifiers, this.body.subst(id, replacement));
+	}
+}
+// ### Tagging term，「指定」一个类型的行为
+class Tag extends Term {
+	/**
+	 * @param {Type} type
+	 */
+	constructor(type) {
+		super();
+		this.type = type;
+	}
+	inspect() {
+		return (" (as " + this.type.zonk().inspect() + ")").yellow;
+	}
+}
+// ### System-F 显式类型实例化
+class Inst extends Term {
+	/**
+	 * @param {Map<string, Type>} args
+	 */
+	constructor(args) {
+		if(!args)debugger;
+		super();
+		this.args = args;
+	}
+	inspect() {
+		let buf = [];
+		for (let [k, v] of this.args) {
+			buf.push(new Slot(k).inspect() + "->" + v.zonk().inspect());
+		}
+		return ("{" + buf.join(", ") + "}").green;
 	}
 }
 
@@ -1122,6 +1481,7 @@ const env = new Environment({ val: 0 }, new Map([
 		["->", "'a",
 			["->", "'b",
 				["*", "'a", "'b"]]]])],
+	["id", translateType(["forall", ["'a"], ["->", "'a", "'a"]])],
 	["+", translateType(["->", "int", ["->", "int", "int"]])],
 	["-", translateType(["->", "int", ["->", "int", "int"]])],
 	["empty?", translateType(["forall", ["'a"], ["->", ["list", '"a'], "bool"]])],
@@ -1161,5 +1521,24 @@ const a = translate(
 			["&", ["strange", "id"], ["id_dyn", ["box_list", 1]]]]]
 );
 
-// 应当返回：`(int * boolean) * int`
-console.log(util.inspect(a.inferSigma(env).zonk(env), { depth: null }));
+const b = translate(
+	["letrec",
+		["id_dyn",
+			["lambda",
+				["x", ["exists", ["'a"], ["box", "'a"]]],
+				["::", ["unbox", "x"], ["list", "int"]]],
+			["->", ["exists", ["'a"], ["box", "'a"]], ["list", "int"]]],
+		["strange",
+			["lambda",
+				["f", ["forall", ["'a"], ["->", "'a", "'a"]]],
+				["&", ["f", 1], ["f", null]]]],
+		["strange", "id"]]
+);
+
+const {type, tagged} = a.inferSigma(env);
+// 应当返回：`(int * boolean) * list int`
+console.log("Type:", type);
+// 应当返回：程序 a 的约制版本
+console.log("\nSystem F Notations: ", tagged);
+// 应当返回：程序 a 的约制版本，已规约的
+console.log("\nSystem F Redex: ", tagged.betaRedex());
