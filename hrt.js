@@ -760,6 +760,9 @@ function unifyComposite(type, env) {
 // 在进行类型检查的时候，我们还会把当前项用一个约制（Coercion）项包装，我们称这种表达式是标记的（Tagged）。约制项目是一个合法的 System F 函数，它会显式标注所有的多态抽象和实例化过程。所有的约制项经过 $\beta$ 规约之后可以达到「给普通函数加类型标注」一样的效果。
 class Term {
 	constructor() {}
+	isAtomic() {
+		return false;
+	}
 	inspect() {}
 	// #### subst :: *this* Term × string × Term → Term
 	// 替换一个变量名为一个其他形式。
@@ -858,6 +861,9 @@ class Lit extends Term {
 		super();
 		this.lit = n;
 	}
+	isAtomic() {
+		return true;
+	}
 	inspect() {
 		return this.lit + "";
 	}
@@ -904,6 +910,9 @@ class Var extends Term {
 		super();
 		this.name = name;
 	}
+	isAtomic() {
+		return true;
+	}
 	inspect() {
 		return this.name;
 	}
@@ -938,19 +947,22 @@ class App extends Term {
 		this.arg = arg;
 	}
 	inspect() {
-		if (this.arg instanceof Lit || this.arg instanceof Var || this.arg instanceof Tag) {
-			return util.inspect(this.fn) + " " + this.arg.inspect();
-		} else {
-			return util.inspect(this.fn) + " (" + this.arg.inspect() + ")";
-		}
+		let l = util.inspect(this.fn);
+		let r = util.inspect(this.arg);
+
+		if (!this.arg.isAtomic()) {r = "(" + r + ")";}
+		if (!(this.fn.isAtomic() || this.fn instanceof App)) {l = "(" + l + ")";}
+		return l + ' ' + r;
 	}
 	betaRedex() {
 		this.fn = this.fn.betaRedex();
 		this.arg = this.arg.betaRedex();
 		if (this.fn instanceof Tag) { // We do not really "tag" something, just leave its argument
 			return this.arg;
-		} else if(this.fn instanceof App && (this.fn.fn instanceof CtorCoercion || this.fn.fn instanceof ArgCoercion)){
+		} else if (this.fn instanceof App && (this.fn.fn instanceof CtorCoercion || this.fn.fn instanceof ArgCoercion)) {
 			return new App(this.fn.arg, this.arg).betaRedex();
+		} else if (this.fn instanceof Inst && !this.fn.args.size) {
+			return this.arg;
 		} else if (this.fn instanceof Inst && this.arg instanceof App && this.arg.fn instanceof Inst) {
 			let m = new Map(this.fn.args);
 			for (let [k, v] of this.arg.fn.args) {
@@ -1001,7 +1013,7 @@ class Lam extends Term {
 		this.body = body;
 	}
 	inspect() {
-		return "(\\" + this.param + ". " + this.body.inspect() + ")";
+		return "\\" + this.param + ". " + this.body.inspect();
 	}
 	betaRedex() {
 		this.body = this.body.betaRedex();
@@ -1059,7 +1071,7 @@ class ALam extends Term {
 		this.body = body;
 	}
 	inspect() {
-		return "(\\" + this.param + " : " + ( this.type.zonk().inspect()).blue + " . " + this.body.inspect() + ")";
+		return "\\" + this.param + " : " + ( this.type.zonk().inspect()).blue + " . " + this.body.inspect();
 	}
 	betaRedex() {
 		this.body = this.body.betaRedex();
@@ -1126,7 +1138,7 @@ class Let extends Term {
 	inspect() {
 		return "let {" +
 		this.terms.map(({name, type, bind}) => (name
-			+ (type ? (":" + type.zonk().inspect()).blue : "")
+			+ (type ? (" : " + type.zonk().inspect()).blue : "")
 			+ " = " + bind.inspect())).join("; ")
 		+ "} in " + this.body.inspect();
 	}
@@ -1201,7 +1213,7 @@ class LetRec extends Term {
 	inspect() {
 		return "let rec {" +
 		this.terms.map(({name, type, bind}) => (name
-			+ (type ? (":" + type.zonk().inspect()).blue : "")
+			+ (type ? (" : " + type.zonk().inspect()).blue : "")
 			+ " = " + bind.inspect())).join("; ")
 		+ "} in " + this.body.inspect();
 	}
@@ -1364,7 +1376,7 @@ class GreatLambda extends Term {
 	}
 	inspect() {
 		if (this.quantifiers.length) {
-			return "(" + ("Λ{" + this.quantifiers.join(" ") + "}. ").red.bold + this.body.inspect() + ")";
+			return ("Λ{" + this.quantifiers.map(x => "'" + x).join(", ") + "}. ").red.bold + this.body.inspect();
 		} else {
 			return this.body.inspect();
 		}
@@ -1387,6 +1399,9 @@ class Tag extends Term {
 		super();
 		this.type = type;
 	}
+	isAtomic() {
+		return true;
+	}
 	inspect() {
 		return ("<as " + this.type.zonk().inspect() + ">").yellow;
 	}
@@ -1401,12 +1416,19 @@ class Inst extends Term {
 		super();
 		this.args = args;
 	}
+	isAtomic() {
+		return true;
+	}
 	inspect() {
-		let buf = [];
-		for (let [k, v] of this.args) {
-			buf.push(new Slot(k).inspect() + "->" + v.zonk().inspect());
+		if (this.args.size) {
+			let buf = [];
+			for (let [k, v] of this.args) {
+				buf.push(new Slot(k).inspect() + " = " + v.zonk().inspect());
+			}
+			return ("<inst " + buf.join(", ") + ">").green;
+		} else {
+			return "";
 		}
-		return ("{" + buf.join(", ") + "}").green;
 	}
 }
 // ### System-F 的约制子特殊形式
@@ -1417,6 +1439,9 @@ class CtorCoercion extends Term {
 	constructor() {
 		super();
 	}
+	isAtomic() {
+		return true;
+	}
 	inspect() {
 		return ("<CTOR>").red;
 	}
@@ -1424,6 +1449,9 @@ class CtorCoercion extends Term {
 class ArgCoercion extends Term {
 	constructor() {
 		super();
+	}
+	isAtomic() {
+		return true;
 	}
 	inspect() {
 		return ("<ARG>").cyan;
