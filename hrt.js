@@ -1537,9 +1537,9 @@ const env = new Environment({ val: 0 }, new Map([
 	["id", translateType(["forall", ["'a"], ["->", "'a", "'a"]])],
 	["+", translateType(["->", "int", ["->", "int", "int"]])],
 	["-", translateType(["->", "int", ["->", "int", "int"]])],
-	["empty?", translateType(["forall", ["'a"], ["->", ["list", '"a'], "bool"]])],
+	["empty?", translateType(["forall", ["'a"], ["->", ["list", "'a"], "bool"]])],
 	["zero?", translateType(["->", "int", "bool"])],
-	["cdr", translateType(["forall", ["'a"], ["->", ["list", '"a'], ["list", "'a"]]])],
+	["cdr", translateType(["forall", ["'a"], ["->", ["list", "'a"], ["list", "'a"]]])],
 	["if", translateType(["forall", ["'a"], ["->",
 		"bool",
 		["->", "'a", ["->", "'a", "'a"]]]])],
@@ -1574,20 +1574,25 @@ const a = translate(
 			["&", ["strange", "id"], ["id_dyn", ["box_list", 1]]]]]
 );
 
+
+// Pretty-print formatting
 const COLORS = ['grey', 'blue', 'cyan'];
-function formatToStr(form, depth, infix) {
+function formatToStr(form, depth, infix, compact) {
 	if (typeof form === "string") return form;
-	if (!infix && form.length === 3 && typeof form[0] === "string" && !/^[\wΛ]+$/.test(stripAnsi( form[0]))) {
-		return formatToStr([form[1], form[0].magenta, form[2]], depth, true);
+	if (!infix && form.length === 3 && typeof form[0] === "string" && !/[\wΛ]/.test(stripAnsi( form[0]))) {
+		return formatToStr([form[1], form[0].magenta, form[2]], depth, true, compact);
 	}
 	const shorts = [];
 	let shortlen = 0;
 	for (let subform of form) {
-		shorts.push(formatToStr(subform, depth + 1, false));
+		shorts.push(formatToStr(subform, depth + 1, false, compact));
 		shortlen += stripAnsi(shorts[shorts.length - 1]).length;
 	}
-	if (shortlen < 80) return (infix ? "(" : "[")[COLORS[depth % COLORS.length]] + shorts.join(" ") + (infix ? ")" : "]")[COLORS[depth % COLORS.length]];
-	else {
+	if (compact || shortlen < 80) {
+		return (infix ? "(" : "[")[COLORS[depth % COLORS.length]]
+			+ shorts.join(" ") 
+			+ (infix ? ")" : "]")[COLORS[depth % COLORS.length]];
+	} else {
 		let buf = (infix ? "(" : "[")[COLORS[depth % COLORS.length]];
 		let lensofar = 0, indent = false;
 		for (let j = 0; j < shorts.length; j++) {
@@ -1600,10 +1605,14 @@ function formatToStr(form, depth, infix) {
 }
 
 console.log("Program:", formatToStr(a.format(), 1, false));
+console.log("\nEnvironment:");
+for(let [k, v] of env.variables.entries()){
+	console.log('    ', k, '::', formatToStr(v.format(), 1, false));
+}
 const {type, tagged} = a.inferSigma(env);
 // 应当返回：`(int * boolean) * list int`
 console.log("\nType:", formatToStr(type.format(), 1, false));
 // 应当返回：程序 a 的约制版本（非常长的）
-console.log("\nSystem F Notations: ", formatToStr(tagged.format(), 1, false));
+/* console.log("\nSystem F Notations: ", formatToStr(tagged.format(), 1, false, true)); */
 // 应当返回：程序 a 的约制版本，已规约的
 console.log("\nSystem F Redex: ", formatToStr(tagged.betaRedex().format(), 1, false));

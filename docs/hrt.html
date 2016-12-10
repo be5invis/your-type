@@ -41,6 +41,7 @@
 
 
 <span class="hljs-keyword">const</span> colors = <span class="hljs-built_in">require</span>(<span class="hljs-string">"colors"</span>);
+<span class="hljs-keyword">const</span> stripAnsi = <span class="hljs-built_in">require</span>(<span class="hljs-string">'strip-ansi'</span>);
 <span class="hljs-keyword">const</span> util = <span class="hljs-built_in">require</span>(<span class="hljs-string">"util"</span>);</pre></div></div>
             
         </li>
@@ -336,11 +337,11 @@
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-14">&#182;</a>
               </div>
-              <h4 id="inspect-this-type-string">inspect :: <em>this</em> Type → string</h4>
+              <h4 id="format-this-type-string">format :: <em>this</em> Type → string</h4>
 
             </div>
             
-            <div class="content"><div class='highlight'><pre>	inspect() {}</pre></div></div>
+            <div class="content"><div class='highlight'><pre>	format() {}</pre></div></div>
             
         </li>
         
@@ -783,8 +784,8 @@
 		<span class="hljs-keyword">super</span>();
 		<span class="hljs-keyword">this</span>.name = name;
 	}
-	inspect() {
-		<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.name;
+	format() {
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.name.yellow;
 	}
 }</pre></div></div>
             
@@ -815,8 +816,8 @@
 		<span class="hljs-keyword">super</span>();
 		<span class="hljs-keyword">this</span>.name = name;
 	}
-	inspect() {
-		<span class="hljs-keyword">return</span> <span class="hljs-string">"'"</span> + <span class="hljs-keyword">this</span>.name;
+	format() {
+		<span class="hljs-keyword">return</span> (<span class="hljs-string">"'"</span> + <span class="hljs-keyword">this</span>.name).green;
 	}
 	_getFreeSlots(bound, a) {
 		<span class="hljs-keyword">if</span> (!bound.has(<span class="hljs-keyword">this</span>.name) &amp;&amp; !a.has(<span class="hljs-keyword">this</span>.name)) {
@@ -888,21 +889,11 @@
 		<span class="hljs-keyword">this</span>.arg = arg;
 		<span class="hljs-keyword">this</span>.contravariant = contravariant || <span class="hljs-literal">false</span>;
 	}
-	inspect() {
-		<span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.fn <span class="hljs-keyword">instanceof</span> Composite &amp;&amp; <span class="hljs-keyword">this</span>.fn.fn <span class="hljs-keyword">instanceof</span> Primitive &amp;&amp; !<span class="hljs-regexp">/^\w/</span>.test(<span class="hljs-keyword">this</span>.fn.fn.name)) {
-			<span class="hljs-keyword">const</span> left = <span class="hljs-keyword">this</span>.fn.arg;
-			<span class="hljs-keyword">const</span> op = <span class="hljs-keyword">this</span>.fn.fn;
-			<span class="hljs-keyword">if</span> (left <span class="hljs-keyword">instanceof</span> Primitive || left <span class="hljs-keyword">instanceof</span> Slot) {
-				<span class="hljs-keyword">return</span> left.inspect() + <span class="hljs-string">" "</span> + op.name + <span class="hljs-string">" "</span> + <span class="hljs-keyword">this</span>.arg.inspect();
-			} <span class="hljs-keyword">else</span> {
-				<span class="hljs-keyword">return</span> <span class="hljs-string">"("</span> + left.inspect() + <span class="hljs-string">") "</span> + op.name + <span class="hljs-string">" "</span> + <span class="hljs-keyword">this</span>.arg.inspect();
-			}
+	format() {
+		<span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.fn <span class="hljs-keyword">instanceof</span> Composite) {
+			<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.fn.format().concat([ <span class="hljs-keyword">this</span>.arg.format()]);
 		} <span class="hljs-keyword">else</span> {
-			<span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.arg <span class="hljs-keyword">instanceof</span> Primitive || <span class="hljs-keyword">this</span>.arg <span class="hljs-keyword">instanceof</span> Slot) {
-				<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.fn.inspect() + <span class="hljs-string">" "</span> + <span class="hljs-keyword">this</span>.arg.inspect();
-			} <span class="hljs-keyword">else</span> {
-				<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.fn.inspect() + <span class="hljs-string">" ("</span> + <span class="hljs-keyword">this</span>.arg.inspect() + <span class="hljs-string">")"</span>;
-			}
+			<span class="hljs-keyword">return</span> [<span class="hljs-keyword">this</span>.fn.format(), <span class="hljs-keyword">this</span>.arg.format()];
 		}
 	}
 	_getMetaSlots(a) {
@@ -1035,11 +1026,11 @@
 		<span class="hljs-keyword">this</span>.quantifiers = quantifiers;
 		<span class="hljs-keyword">this</span>.body = body;
 	}
-	inspect() {
+	format() {
 		<span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.quantifiers.length) {
-			<span class="hljs-keyword">return</span> <span class="hljs-string">"forall "</span> + <span class="hljs-keyword">this</span>.quantifiers.join(<span class="hljs-string">" "</span>) + <span class="hljs-string">". "</span> + <span class="hljs-keyword">this</span>.body.inspect();
+			<span class="hljs-keyword">return</span> [<span class="hljs-string">"forall"</span>.cyan.bold, <span class="hljs-keyword">this</span>.quantifiers.map(<span class="hljs-function"><span class="hljs-params">x</span> =&gt;</span> <span class="hljs-keyword">new</span> Slot(x).format()), <span class="hljs-keyword">this</span>.body.format()];
 		} <span class="hljs-keyword">else</span> {
-			<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.body.inspect();
+			<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.body.format();
 		}
 	}
 	_getMetaSlots(a) {
@@ -1182,7 +1173,7 @@
 		<span class="hljs-keyword">super</span>();
 		<span class="hljs-keyword">this</span>.arg = arg;
 	}
-	inspect() {
+	format() {
 		<span class="hljs-keyword">return</span> (<span class="hljs-string">"?"</span> + <span class="hljs-keyword">this</span>.arg.id).red.bold;
 	}
 	_getMetaSlots(a) {
@@ -1273,7 +1264,7 @@
 		<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>;
 	}
 	<span class="hljs-keyword">if</span> (t1 <span class="hljs-keyword">instanceof</span> Primitive &amp;&amp; t2 <span class="hljs-keyword">instanceof</span> Primitive &amp;&amp; t1.name === t2.name) { <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>; }
-	<span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-built_in">Error</span>(<span class="hljs-string">`Cannot unify <span class="hljs-subst">${t1.inspect()}</span> with <span class="hljs-subst">${t2.inspect()}</span>`</span>)
+	<span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-built_in">Error</span>(<span class="hljs-string">`Cannot unify <span class="hljs-subst">${t1.format()}</span> with <span class="hljs-subst">${t2.format()}</span>`</span>)
 }
 <span class="hljs-comment">/**
  * @param {Type} t
@@ -1445,7 +1436,10 @@
             
             <div class="content"><div class='highlight'><pre><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Term</span> </span>{
 	<span class="hljs-keyword">constructor</span>() {}
-	inspect() {}</pre></div></div>
+	isAtomic() {
+		<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>;
+	}
+	format() {}</pre></div></div>
             
         </li>
         
@@ -1628,7 +1622,10 @@
 		<span class="hljs-keyword">super</span>();
 		<span class="hljs-keyword">this</span>.lit = n;
 	}
-	inspect() {
+	isAtomic() {
+		<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>;
+	}
+	format() {
 		<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.lit + <span class="hljs-string">""</span>;
 	}
 	<span class="hljs-comment">/**
@@ -1713,7 +1710,10 @@
 		<span class="hljs-keyword">super</span>();
 		<span class="hljs-keyword">this</span>.name = name;
 	}
-	inspect() {
+	isAtomic() {
+		<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>;
+	}
+	format() {
 		<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.name;
 	}
 	<span class="hljs-comment">/**
@@ -1785,11 +1785,11 @@
 		<span class="hljs-keyword">this</span>.fn = fn;
 		<span class="hljs-keyword">this</span>.arg = arg;
 	}
-	inspect() {
-		<span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.arg <span class="hljs-keyword">instanceof</span> Lit || <span class="hljs-keyword">this</span>.arg <span class="hljs-keyword">instanceof</span> Var || <span class="hljs-keyword">this</span>.arg <span class="hljs-keyword">instanceof</span> Tag) {
-			<span class="hljs-keyword">return</span> util.inspect(<span class="hljs-keyword">this</span>.fn) + <span class="hljs-string">" "</span> + <span class="hljs-keyword">this</span>.arg.inspect();
+	format() {
+		<span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.fn <span class="hljs-keyword">instanceof</span> App) {
+			<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.fn.format().concat([<span class="hljs-keyword">this</span>.arg.format()]);
 		} <span class="hljs-keyword">else</span> {
-			<span class="hljs-keyword">return</span> util.inspect(<span class="hljs-keyword">this</span>.fn) + <span class="hljs-string">" ("</span> + <span class="hljs-keyword">this</span>.arg.inspect() + <span class="hljs-string">")"</span>;
+			<span class="hljs-keyword">return</span> [<span class="hljs-keyword">this</span>.fn.format(), <span class="hljs-keyword">this</span>.arg.format()];
 		}
 	}
 	betaRedex() {
@@ -1797,8 +1797,10 @@
 		<span class="hljs-keyword">this</span>.arg = <span class="hljs-keyword">this</span>.arg.betaRedex();
 		<span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.fn <span class="hljs-keyword">instanceof</span> Tag) { <span class="hljs-comment">// We do not really "tag" something, just leave its argument</span>
 			<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.arg;
-		} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(<span class="hljs-keyword">this</span>.fn <span class="hljs-keyword">instanceof</span> App &amp;&amp; (<span class="hljs-keyword">this</span>.fn.fn <span class="hljs-keyword">instanceof</span> CtorCoercion || <span class="hljs-keyword">this</span>.fn.fn <span class="hljs-keyword">instanceof</span> ArgCoercion)){
+		} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.fn <span class="hljs-keyword">instanceof</span> App &amp;&amp; (<span class="hljs-keyword">this</span>.fn.fn <span class="hljs-keyword">instanceof</span> CtorCoercion || <span class="hljs-keyword">this</span>.fn.fn <span class="hljs-keyword">instanceof</span> ArgCoercion)) {
 			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> App(<span class="hljs-keyword">this</span>.fn.arg, <span class="hljs-keyword">this</span>.arg).betaRedex();
+		} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.fn <span class="hljs-keyword">instanceof</span> Inst &amp;&amp; !<span class="hljs-keyword">this</span>.fn.args.size) {
+			<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.arg;
 		} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.fn <span class="hljs-keyword">instanceof</span> Inst &amp;&amp; <span class="hljs-keyword">this</span>.arg <span class="hljs-keyword">instanceof</span> App &amp;&amp; <span class="hljs-keyword">this</span>.arg.fn <span class="hljs-keyword">instanceof</span> Inst) {
 			<span class="hljs-keyword">let</span> m = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Map</span>(<span class="hljs-keyword">this</span>.fn.args);
 			<span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> [k, v] <span class="hljs-keyword">of</span> <span class="hljs-keyword">this</span>.arg.fn.args) {
@@ -1887,8 +1889,8 @@
 		<span class="hljs-keyword">this</span>.param = param;
 		<span class="hljs-keyword">this</span>.body = body;
 	}
-	inspect() {
-		<span class="hljs-keyword">return</span> <span class="hljs-string">"(\\"</span> + <span class="hljs-keyword">this</span>.param + <span class="hljs-string">". "</span> + <span class="hljs-keyword">this</span>.body.inspect() + <span class="hljs-string">")"</span>;
+	format() {
+		<span class="hljs-keyword">return</span> [<span class="hljs-string">"lambda"</span>.yellow.bold, <span class="hljs-keyword">this</span>.param, <span class="hljs-keyword">this</span>.body.format()];
 	}
 	betaRedex() {
 		<span class="hljs-keyword">this</span>.body = <span class="hljs-keyword">this</span>.body.betaRedex();
@@ -1984,8 +1986,8 @@
 		<span class="hljs-keyword">this</span>.type = type;
 		<span class="hljs-keyword">this</span>.body = body;
 	}
-	inspect() {
-		<span class="hljs-keyword">return</span> <span class="hljs-string">"(\\"</span> + <span class="hljs-keyword">this</span>.param + <span class="hljs-string">" : "</span> + ( <span class="hljs-keyword">this</span>.type.zonk().inspect()).blue + <span class="hljs-string">" . "</span> + <span class="hljs-keyword">this</span>.body.inspect() + <span class="hljs-string">")"</span>;
+	format() {
+		<span class="hljs-keyword">return</span> [<span class="hljs-string">"lambda"</span>.yellow.bold, [<span class="hljs-string">"::"</span>, <span class="hljs-keyword">this</span>.param, <span class="hljs-keyword">this</span>.type.zonk().format()], <span class="hljs-keyword">this</span>.body.format()];
 	}
 	betaRedex() {
 		<span class="hljs-keyword">this</span>.body = <span class="hljs-keyword">this</span>.body.betaRedex();
@@ -2087,12 +2089,12 @@
 		<span class="hljs-keyword">this</span>.body = <span class="hljs-keyword">this</span>.body.betaRedex();
 		<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>;
 	}
-	inspect() {
-		<span class="hljs-keyword">return</span> <span class="hljs-string">"let {"</span> +
-		<span class="hljs-keyword">this</span>.terms.map(<span class="hljs-function">(<span class="hljs-params">{name, type, bind}</span>) =&gt;</span> (name
-			+ (type ? (<span class="hljs-string">":"</span> + type.zonk().inspect()).blue : <span class="hljs-string">""</span>)
-			+ <span class="hljs-string">" = "</span> + bind.inspect())).join(<span class="hljs-string">"; "</span>)
-		+ <span class="hljs-string">"} in "</span> + <span class="hljs-keyword">this</span>.body.inspect();
+	format() {
+		<span class="hljs-keyword">return</span> [<span class="hljs-string">"let"</span>.yellow.bold].concat(
+			<span class="hljs-keyword">this</span>.terms.map(<span class="hljs-function">(<span class="hljs-params">{name, type, bind}</span>) =&gt;</span> type 
+				? [<span class="hljs-string">'='</span>, [<span class="hljs-string">'::'</span>, name, type.format()], bind.format()] 
+				: [<span class="hljs-string">'='</span>, name, bind.format()]),
+			[<span class="hljs-keyword">this</span>.body.format()]);
 	}
 	<span class="hljs-comment">/**
 	 * @param{string} id
@@ -2201,12 +2203,12 @@
 		<span class="hljs-keyword">this</span>.body = <span class="hljs-keyword">this</span>.body.betaRedex();
 		<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>;
 	}
-	inspect() {
-		<span class="hljs-keyword">return</span> <span class="hljs-string">"let rec {"</span> +
-		<span class="hljs-keyword">this</span>.terms.map(<span class="hljs-function">(<span class="hljs-params">{name, type, bind}</span>) =&gt;</span> (name
-			+ (type ? (<span class="hljs-string">":"</span> + type.zonk().inspect()).blue : <span class="hljs-string">""</span>)
-			+ <span class="hljs-string">" = "</span> + bind.inspect())).join(<span class="hljs-string">"; "</span>)
-		+ <span class="hljs-string">"} in "</span> + <span class="hljs-keyword">this</span>.body.inspect();
+	format() {
+		<span class="hljs-keyword">return</span> [<span class="hljs-string">"letrec"</span>.yellow.bold].concat(
+			<span class="hljs-keyword">this</span>.terms.map(<span class="hljs-function">(<span class="hljs-params">{name, type, bind}</span>) =&gt;</span> type 
+				? [<span class="hljs-string">'='</span>, [<span class="hljs-string">'::'</span>, name, type.format()], bind.format()] 
+				: [<span class="hljs-string">'='</span>, name, bind.format()]),
+			[<span class="hljs-keyword">this</span>.body.format()]);
 	}
 	<span class="hljs-comment">/**
 	 * @param{string} id
@@ -2341,11 +2343,11 @@
 		}
 		<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>;
 	}
-	inspect() {
+	format() {
 		<span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.body <span class="hljs-keyword">instanceof</span> Var) {
-			<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.body.inspect() + (<span class="hljs-string">" as "</span> + <span class="hljs-keyword">this</span>.type.zonk().inspect()).blue;
+			<span class="hljs-keyword">return</span> [<span class="hljs-string">"::"</span>, <span class="hljs-keyword">this</span>.body.format(), <span class="hljs-keyword">this</span>.type.zonk().format()];
 		} <span class="hljs-keyword">else</span> {
-			<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.body.inspect();
+			<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.body.format();
 		}
 	}
 	subst(name, replacement) {
@@ -2440,11 +2442,11 @@
 			<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>;
 		}
 	}
-	inspect() {
+	format() {
 		<span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.quantifiers.length) {
-			<span class="hljs-keyword">return</span> <span class="hljs-string">"("</span> + (<span class="hljs-string">"Λ{"</span> + <span class="hljs-keyword">this</span>.quantifiers.join(<span class="hljs-string">" "</span>) + <span class="hljs-string">"}. "</span>).red.bold + <span class="hljs-keyword">this</span>.body.inspect() + <span class="hljs-string">")"</span>;
+			<span class="hljs-keyword">return</span> [<span class="hljs-string">"Λ"</span>.yellow.bold, <span class="hljs-keyword">this</span>.quantifiers.map(<span class="hljs-function"><span class="hljs-params">x</span> =&gt;</span> <span class="hljs-keyword">new</span> Slot(x).format()), <span class="hljs-keyword">this</span>.body.format()];
 		} <span class="hljs-keyword">else</span> {
-			<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.body.inspect();
+			<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.body.format();
 		}
 	}
 	<span class="hljs-comment">/**
@@ -2478,8 +2480,11 @@
 		<span class="hljs-keyword">super</span>();
 		<span class="hljs-keyword">this</span>.type = type;
 	}
-	inspect() {
-		<span class="hljs-keyword">return</span> (<span class="hljs-string">"&lt;as "</span> + <span class="hljs-keyword">this</span>.type.zonk().inspect() + <span class="hljs-string">"&gt;"</span>).yellow;
+	isAtomic() {
+		<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>;
+	}
+	format() {
+		<span class="hljs-keyword">return</span> [<span class="hljs-string">"as"</span>.yellow.bold, <span class="hljs-keyword">this</span>.type.zonk().format()];
 	}
 }</pre></div></div>
             
@@ -2505,12 +2510,19 @@
 		<span class="hljs-keyword">super</span>();
 		<span class="hljs-keyword">this</span>.args = args;
 	}
-	inspect() {
-		<span class="hljs-keyword">let</span> buf = [];
-		<span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> [k, v] <span class="hljs-keyword">of</span> <span class="hljs-keyword">this</span>.args) {
-			buf.push(<span class="hljs-keyword">new</span> Slot(k).inspect() + <span class="hljs-string">"-&gt;"</span> + v.zonk().inspect());
+	isAtomic() {
+		<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>;
+	}
+	format() {
+		<span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.args.size) {
+			<span class="hljs-keyword">let</span> buf = [];
+			<span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> [k, v] <span class="hljs-keyword">of</span> <span class="hljs-keyword">this</span>.args) {
+				buf.push([<span class="hljs-string">'='</span>, <span class="hljs-keyword">new</span> Slot(k).format(), v.zonk().format()]);
+			}
+			<span class="hljs-keyword">return</span> [<span class="hljs-string">"inst"</span>.yellow.bold].concat(buf);
+		} <span class="hljs-keyword">else</span> {
+			<span class="hljs-keyword">return</span> <span class="hljs-string">""</span>;
 		}
-		<span class="hljs-keyword">return</span> (<span class="hljs-string">"{"</span> + buf.join(<span class="hljs-string">", "</span>) + <span class="hljs-string">"}"</span>).green;
 	}
 }</pre></div></div>
             
@@ -2533,7 +2545,10 @@
 	<span class="hljs-keyword">constructor</span>() {
 		<span class="hljs-keyword">super</span>();
 	}
-	inspect() {
+	isAtomic() {
+		<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>;
+	}
+	format() {
 		<span class="hljs-keyword">return</span> (<span class="hljs-string">"&lt;CTOR&gt;"</span>).red;
 	}
 }
@@ -2541,7 +2556,10 @@
 	<span class="hljs-keyword">constructor</span>() {
 		<span class="hljs-keyword">super</span>();
 	}
-	inspect() {
+	isAtomic() {
+		<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>;
+	}
+	format() {
 		<span class="hljs-keyword">return</span> (<span class="hljs-string">"&lt;ARG&gt;"</span>).cyan;
 	}
 }</pre></div></div>
@@ -2696,9 +2714,9 @@
 	[<span class="hljs-string">"id"</span>, translateType([<span class="hljs-string">"forall"</span>, [<span class="hljs-string">"'a"</span>], [<span class="hljs-string">"-&gt;"</span>, <span class="hljs-string">"'a"</span>, <span class="hljs-string">"'a"</span>]])],
 	[<span class="hljs-string">"+"</span>, translateType([<span class="hljs-string">"-&gt;"</span>, <span class="hljs-string">"int"</span>, [<span class="hljs-string">"-&gt;"</span>, <span class="hljs-string">"int"</span>, <span class="hljs-string">"int"</span>]])],
 	[<span class="hljs-string">"-"</span>, translateType([<span class="hljs-string">"-&gt;"</span>, <span class="hljs-string">"int"</span>, [<span class="hljs-string">"-&gt;"</span>, <span class="hljs-string">"int"</span>, <span class="hljs-string">"int"</span>]])],
-	[<span class="hljs-string">"empty?"</span>, translateType([<span class="hljs-string">"forall"</span>, [<span class="hljs-string">"'a"</span>], [<span class="hljs-string">"-&gt;"</span>, [<span class="hljs-string">"list"</span>, <span class="hljs-string">'"a'</span>], <span class="hljs-string">"bool"</span>]])],
+	[<span class="hljs-string">"empty?"</span>, translateType([<span class="hljs-string">"forall"</span>, [<span class="hljs-string">"'a"</span>], [<span class="hljs-string">"-&gt;"</span>, [<span class="hljs-string">"list"</span>, <span class="hljs-string">"'a"</span>], <span class="hljs-string">"bool"</span>]])],
 	[<span class="hljs-string">"zero?"</span>, translateType([<span class="hljs-string">"-&gt;"</span>, <span class="hljs-string">"int"</span>, <span class="hljs-string">"bool"</span>])],
-	[<span class="hljs-string">"cdr"</span>, translateType([<span class="hljs-string">"forall"</span>, [<span class="hljs-string">"'a"</span>], [<span class="hljs-string">"-&gt;"</span>, [<span class="hljs-string">"list"</span>, <span class="hljs-string">'"a'</span>], [<span class="hljs-string">"list"</span>, <span class="hljs-string">"'a"</span>]]])],
+	[<span class="hljs-string">"cdr"</span>, translateType([<span class="hljs-string">"forall"</span>, [<span class="hljs-string">"'a"</span>], [<span class="hljs-string">"-&gt;"</span>, [<span class="hljs-string">"list"</span>, <span class="hljs-string">"'a"</span>], [<span class="hljs-string">"list"</span>, <span class="hljs-string">"'a"</span>]]])],
 	[<span class="hljs-string">"if"</span>, translateType([<span class="hljs-string">"forall"</span>, [<span class="hljs-string">"'a"</span>], [<span class="hljs-string">"-&gt;"</span>,
 		<span class="hljs-string">"bool"</span>,
 		[<span class="hljs-string">"-&gt;"</span>, <span class="hljs-string">"'a"</span>, [<span class="hljs-string">"-&gt;"</span>, <span class="hljs-string">"'a"</span>, <span class="hljs-string">"'a"</span>]]]])],
@@ -2743,9 +2761,7 @@
 					[<span class="hljs-string">"f"</span>, [<span class="hljs-string">"forall"</span>, [<span class="hljs-string">"'a"</span>], [<span class="hljs-string">"-&gt;"</span>, <span class="hljs-string">"'a"</span>, <span class="hljs-string">"'a"</span>]]],
 					[<span class="hljs-string">"&amp;"</span>, [<span class="hljs-string">"f"</span>, <span class="hljs-number">1</span>], [<span class="hljs-string">"f"</span>, [<span class="hljs-string">"even?"</span>, <span class="hljs-number">5</span>]]]]],
 			[<span class="hljs-string">"&amp;"</span>, [<span class="hljs-string">"strange"</span>, <span class="hljs-string">"id"</span>], [<span class="hljs-string">"id_dyn"</span>, [<span class="hljs-string">"box_list"</span>, <span class="hljs-number">1</span>]]]]]
-);
-
-<span class="hljs-keyword">const</span> {type, tagged} = a.inferSigma(env);</pre></div></div>
+);</pre></div></div>
             
         </li>
         
@@ -2756,11 +2772,44 @@
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-93">&#182;</a>
               </div>
-              <p>应当返回：<code>(int * boolean) * list int</code></p>
+              <p>Pretty-print formatting</p>
 
             </div>
             
-            <div class="content"><div class='highlight'><pre><span class="hljs-built_in">console</span>.log(<span class="hljs-string">"Type:"</span>, type);</pre></div></div>
+            <div class="content"><div class='highlight'><pre><span class="hljs-keyword">const</span> COLORS = [<span class="hljs-string">'grey'</span>, <span class="hljs-string">'blue'</span>, <span class="hljs-string">'cyan'</span>];
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">formatToStr</span>(<span class="hljs-params">form, depth, infix, compact</span>) </span>{
+	<span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> form === <span class="hljs-string">"string"</span>) <span class="hljs-keyword">return</span> form;
+	<span class="hljs-keyword">if</span> (!infix &amp;&amp; form.length === <span class="hljs-number">3</span> &amp;&amp; <span class="hljs-keyword">typeof</span> form[<span class="hljs-number">0</span>] === <span class="hljs-string">"string"</span> &amp;&amp; !<span class="hljs-regexp">/[\wΛ]/</span>.test(stripAnsi( form[<span class="hljs-number">0</span>]))) {
+		<span class="hljs-keyword">return</span> formatToStr([form[<span class="hljs-number">1</span>], form[<span class="hljs-number">0</span>].magenta, form[<span class="hljs-number">2</span>]], depth, <span class="hljs-literal">true</span>, compact);
+	}
+	<span class="hljs-keyword">const</span> shorts = [];
+	<span class="hljs-keyword">let</span> shortlen = <span class="hljs-number">0</span>;
+	<span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> subform <span class="hljs-keyword">of</span> form) {
+		shorts.push(formatToStr(subform, depth + <span class="hljs-number">1</span>, <span class="hljs-literal">false</span>, compact));
+		shortlen += stripAnsi(shorts[shorts.length - <span class="hljs-number">1</span>]).length;
+	}
+	<span class="hljs-keyword">if</span> (compact || shortlen &lt; <span class="hljs-number">80</span>) {
+		<span class="hljs-keyword">return</span> (infix ? <span class="hljs-string">"("</span> : <span class="hljs-string">"["</span>)[COLORS[depth % COLORS.length]]
+			+ shorts.join(<span class="hljs-string">" "</span>) 
+			+ (infix ? <span class="hljs-string">")"</span> : <span class="hljs-string">"]"</span>)[COLORS[depth % COLORS.length]];
+	} <span class="hljs-keyword">else</span> {
+		<span class="hljs-keyword">let</span> buf = (infix ? <span class="hljs-string">"("</span> : <span class="hljs-string">"["</span>)[COLORS[depth % COLORS.length]];
+		<span class="hljs-keyword">let</span> lensofar = <span class="hljs-number">0</span>, indent = <span class="hljs-literal">false</span>;
+		<span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> j = <span class="hljs-number">0</span>; j &lt; shorts.length; j++) {
+			lensofar += stripAnsi(shorts[j]).length;
+			indent = indent || lensofar &gt;= <span class="hljs-number">80</span>;
+			buf += ((indent &amp;&amp; j) ? <span class="hljs-string">"\n"</span> + <span class="hljs-string">"  "</span>.repeat(depth) : <span class="hljs-string">" "</span>) + shorts[j];
+		}
+		<span class="hljs-keyword">return</span> buf + (infix ? <span class="hljs-string">")"</span> : <span class="hljs-string">"]"</span>)[COLORS[depth % COLORS.length]];
+	}
+}
+
+<span class="hljs-built_in">console</span>.log(<span class="hljs-string">"Program:"</span>, formatToStr(a.format(), <span class="hljs-number">1</span>, <span class="hljs-literal">false</span>));
+<span class="hljs-built_in">console</span>.log(<span class="hljs-string">"\nEnvironment:"</span>);
+<span class="hljs-keyword">for</span>(<span class="hljs-keyword">let</span> [k, v] <span class="hljs-keyword">of</span> env.variables.entries()){
+	<span class="hljs-built_in">console</span>.log(<span class="hljs-string">'    '</span>, k, <span class="hljs-string">'::'</span>, formatToStr(v.format(), <span class="hljs-number">1</span>, <span class="hljs-literal">false</span>));
+}
+<span class="hljs-keyword">const</span> {type, tagged} = a.inferSigma(env);</pre></div></div>
             
         </li>
         
@@ -2771,11 +2820,11 @@
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-94">&#182;</a>
               </div>
-              <p>应当返回：程序 a 的约制版本（非常长的）</p>
+              <p>应当返回：<code>(int * boolean) * list int</code></p>
 
             </div>
             
-            <div class="content"><div class='highlight'><pre><span class="hljs-built_in">console</span>.log(<span class="hljs-string">"\nSystem F Notations: "</span>, tagged);</pre></div></div>
+            <div class="content"><div class='highlight'><pre><span class="hljs-built_in">console</span>.log(<span class="hljs-string">"\nType:"</span>, formatToStr(type.format(), <span class="hljs-number">1</span>, <span class="hljs-literal">false</span>));</pre></div></div>
             
         </li>
         
@@ -2786,11 +2835,26 @@
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-95">&#182;</a>
               </div>
+              <p>应当返回：程序 a 的约制版本（非常长的）</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-comment">/* console.log("\nSystem F Notations: ", formatToStr(tagged.format(), 1, false, true)); */</span></pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-96">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-96">&#182;</a>
+              </div>
               <p>应当返回：程序 a 的约制版本，已规约的</p>
 
             </div>
             
-            <div class="content"><div class='highlight'><pre><span class="hljs-built_in">console</span>.log(<span class="hljs-string">"\nSystem F Redex: "</span>, tagged.betaRedex());</pre></div></div>
+            <div class="content"><div class='highlight'><pre><span class="hljs-built_in">console</span>.log(<span class="hljs-string">"\nSystem F Redex: "</span>, formatToStr(tagged.betaRedex().format(), <span class="hljs-number">1</span>, <span class="hljs-literal">false</span>));</pre></div></div>
             
         </li>
         
