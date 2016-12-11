@@ -597,9 +597,9 @@ class ForAll extends Type {
 						for (let [k, v] of m.entries()) {
 							m1.set(k, v);
 						}
-						return new App(new Inst(m1), x.arg);
+						return new Inst(x.arg, m1);
 					} else {
-						return new App(new Inst(m), x);
+						return new Inst(x, m);
 					}
 				} else {
 					return x;
@@ -631,7 +631,7 @@ class ForAll extends Type {
 			coercion: function (x) {
 				const mRev = new Map(Array.from(mSub).map(([k, v])=>[v.name, new Slot(k)]));
 				if (m.size) {
-					return buildGL(mSub.keys(), new App(new Inst(mRev), f(x)));
+					return buildGL(mSub.keys(),new Inst(f(x), mRev));
 				} else {
 					return f(x);
 				}
@@ -1398,22 +1398,20 @@ class GreatLambda extends Term {
 // ### System-F 显式类型实例化。$\mathrm{Inst}(\alpha\rightarrow\rho)=\lambda x.x^{\{\alpha=\rho\}}$
 class Inst extends Term {
 	/**
+	 * @param {Term} body
 	 * @param {Map<string, Type>} args
 	 */
-	constructor(args) {
-		if (!args)debugger;
+	constructor(body, args) {
 		super();
+		this.body = body;
 		this.args = args;
-	}
-	isAtomic() {
-		return true;
 	}
 	format() {
 		let buf = [];
 		for (let [k, v] of this.args) {
 			buf.push(["=", new Slot(k).format(), v.zonk().format()]);
 		}
-		return ["inst".yellow.bold].concat(buf);
+		return ["inst".yellow.bold, this.body.format()].concat(buf);
 	}
 }
 
