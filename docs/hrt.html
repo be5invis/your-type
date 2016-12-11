@@ -1251,8 +1251,9 @@
 			<span class="hljs-attr">map</span>: m1,
 			<span class="hljs-attr">type</span>: t1,
 			<span class="hljs-attr">coercion</span>: <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">x</span>) </span>{
+				<span class="hljs-keyword">const</span> mRev = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Map</span>(<span class="hljs-built_in">Array</span>.from(mSub).map(<span class="hljs-function">(<span class="hljs-params">[k, v]</span>)=&gt;</span>[v.name, <span class="hljs-keyword">new</span> Slot(k)]));
 				<span class="hljs-keyword">if</span> (m.size) {
-					<span class="hljs-keyword">return</span> buildGL(mSub.keys(), f(<span class="hljs-keyword">new</span> App(<span class="hljs-keyword">new</span> Inst(mSub), x)));
+					<span class="hljs-keyword">return</span> buildGL(mSub.keys(), <span class="hljs-keyword">new</span> App(<span class="hljs-keyword">new</span> Inst(mRev), f(x)));
 				} <span class="hljs-keyword">else</span> {
 					<span class="hljs-keyword">return</span> f(x);
 				}

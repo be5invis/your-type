@@ -629,8 +629,9 @@ class ForAll extends Type {
 			map: m1,
 			type: t1,
 			coercion: function (x) {
+				const mRev = new Map(Array.from(mSub).map(([k, v])=>[v.name, new Slot(k)]));
 				if (m.size) {
-					return buildGL(mSub.keys(), f(new App(new Inst(mSub), x)));
+					return buildGL(mSub.keys(), new App(new Inst(mRev), f(x)));
 				} else {
 					return f(x);
 				}
