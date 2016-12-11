@@ -2007,7 +2007,7 @@
 		<span class="hljs-keyword">this</span>.body = body;
 	}
 	format() {
-		<span class="hljs-keyword">return</span> [<span class="hljs-string">"lambda"</span>.yellow.bold, <span class="hljs-keyword">this</span>.param, <span class="hljs-keyword">this</span>.body.format()];
+		<span class="hljs-keyword">return</span> [<span class="hljs-string">"λ"</span>.yellow.bold, <span class="hljs-keyword">this</span>.param, <span class="hljs-keyword">this</span>.body.format()];
 	}
 	<span class="hljs-comment">/**
 	 * @param{string} id
@@ -2100,7 +2100,7 @@
 		<span class="hljs-keyword">this</span>.body = body;
 	}
 	format() {
-		<span class="hljs-keyword">return</span> [<span class="hljs-string">"lambda"</span>.yellow.bold, [<span class="hljs-string">"::"</span>, <span class="hljs-keyword">this</span>.param, <span class="hljs-keyword">this</span>.type.zonk().format()], <span class="hljs-keyword">this</span>.body.format()];
+		<span class="hljs-keyword">return</span> [<span class="hljs-string">"λ"</span>.yellow.bold, [<span class="hljs-string">"::"</span>, <span class="hljs-keyword">this</span>.param, <span class="hljs-keyword">this</span>.type.zonk().format()], <span class="hljs-keyword">this</span>.body.format()];
 	}
 	<span class="hljs-comment">/**
 	 * @param{string} id
@@ -2790,7 +2790,7 @@
 <span class="hljs-keyword">const</span> COLUMNS = <span class="hljs-number">100</span>;
 <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">formatToStr</span>(<span class="hljs-params">form, depth, infix, compact</span>) </span>{
 	<span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> form === <span class="hljs-string">"string"</span>) <span class="hljs-keyword">return</span> form;
-	<span class="hljs-keyword">if</span> (!infix &amp;&amp; form.length === <span class="hljs-number">3</span> &amp;&amp; <span class="hljs-keyword">typeof</span> form[<span class="hljs-number">0</span>] === <span class="hljs-string">"string"</span> &amp;&amp; !<span class="hljs-regexp">/[\wΛ]/</span>.test(stripAnsi(form[<span class="hljs-number">0</span>]))) {
+	<span class="hljs-keyword">if</span> (!infix &amp;&amp; form.length === <span class="hljs-number">3</span> &amp;&amp; <span class="hljs-keyword">typeof</span> form[<span class="hljs-number">0</span>] === <span class="hljs-string">"string"</span> &amp;&amp; !<span class="hljs-regexp">/[\wΛλ]/</span>.test(stripAnsi(form[<span class="hljs-number">0</span>]))) {
 		<span class="hljs-keyword">return</span> formatToStr([form[<span class="hljs-number">1</span>], form[<span class="hljs-number">0</span>].magenta, form[<span class="hljs-number">2</span>]], depth, <span class="hljs-literal">true</span>, compact);
 	}
 	<span class="hljs-keyword">const</span> shorts = [];

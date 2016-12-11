@@ -1067,7 +1067,7 @@ class Lam extends Term {
 		this.body = body;
 	}
 	format() {
-		return ["lambda".yellow.bold, this.param, this.body.format()];
+		return ["λ".yellow.bold, this.param, this.body.format()];
 	}
 	/**
 	 * @param{string} id
@@ -1121,7 +1121,7 @@ class ALam extends Term {
 		this.body = body;
 	}
 	format() {
-		return ["lambda".yellow.bold, ["::", this.param, this.type.zonk().format()], this.body.format()];
+		return ["λ".yellow.bold, ["::", this.param, this.type.zonk().format()], this.body.format()];
 	}
 	/**
 	 * @param{string} id
@@ -1549,7 +1549,7 @@ const COLORS = ["grey", "blue", "cyan"];
 const COLUMNS = 100;
 function formatToStr(form, depth, infix, compact) {
 	if (typeof form === "string") return form;
-	if (!infix && form.length === 3 && typeof form[0] === "string" && !/[\wΛ]/.test(stripAnsi(form[0]))) {
+	if (!infix && form.length === 3 && typeof form[0] === "string" && !/[\wΛλ]/.test(stripAnsi(form[0]))) {
 		return formatToStr([form[1], form[0].magenta, form[2]], depth, true, compact);
 	}
 	const shorts = [];
