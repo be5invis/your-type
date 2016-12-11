@@ -1339,7 +1339,8 @@ class Ann extends Term {
 		this.type = type;
 	}
 	format() {
-		return ["::", this.body.format(), this.type.zonk().format()];
+		return this.body.format();
+		//return ["::", this.body.format(), this.type.zonk().format()];
 	}
 	subst(name, replacement) {
 		return new Ann(this.body.subst(name, replacement), this.type);

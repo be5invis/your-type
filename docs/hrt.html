@@ -2432,11 +2432,7 @@
 		<span class="hljs-keyword">this</span>.type = type;
 	}
 	format() {
-		<span class="hljs-keyword">return</span> [<span class="hljs-string">"::"</span>, <span class="hljs-keyword">this</span>.body.format(), <span class="hljs-keyword">this</span>.type.zonk().format()];
-	}
-	subst(name, replacement) {
-		<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Ann(<span class="hljs-keyword">this</span>.body.subst(name, replacement), <span class="hljs-keyword">this</span>.type);
-	}</pre></div></div>
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.body.format();</pre></div></div>
             
         </li>
         
@@ -2446,6 +2442,24 @@
               
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-85">&#182;</a>
+              </div>
+              <p>return [“::”, this.body.format(), this.type.zonk().format()];</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	}
+	subst(name, replacement) {
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Ann(<span class="hljs-keyword">this</span>.body.subst(name, replacement), <span class="hljs-keyword">this</span>.type);
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-86">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-86">&#182;</a>
               </div>
               <p>CHECK-ANN: $\dfrac{\Gamma\vdash^* t:\sigma \quad \sigma\le\rho}{\Gamma\vdash(t:\sigma):\rho}$</p>
 
@@ -2464,11 +2478,11 @@
         </li>
         
         
-        <li id="section-86">
+        <li id="section-87">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-86">&#182;</a>
+                <a class="pilcrow" href="#section-87">&#182;</a>
               </div>
               <p>INFER-ANN: $\dfrac{\Gamma\vdash^* t:\sigma \quad \sigma\le\sim\rho}{\Gamma\vdash(t:\sigma):\sim\rho}$</p>
 
@@ -2488,11 +2502,11 @@
         </li>
         
         
-        <li id="section-87">
+        <li id="section-88">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-87">&#182;</a>
+                <a class="pilcrow" href="#section-88">&#182;</a>
               </div>
               <p>以下的项目为 System F 的高阶构造，它们主要用于构造约制子。</p>
 <h3 id="system-f-lambda-overline-alpha-e-">System-F 类型抽象，$\Lambda\overline\alpha.e$</h3>
@@ -2529,11 +2543,11 @@
         </li>
         
         
-        <li id="section-88">
+        <li id="section-89">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-88">&#182;</a>
+                <a class="pilcrow" href="#section-89">&#182;</a>
               </div>
               <h3 id="system-f-mathrm-inst-alpha-rightarrow-rho-lambda-x-x-alpha-rho-">System-F 显式类型实例化。$\mathrm{Inst}(\alpha\rightarrow\rho)=\lambda x.x^{{\alpha=\rho}}$</h3>
 
@@ -2563,11 +2577,11 @@
         </li>
         
         
-        <li id="section-89">
+        <li id="section-90">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-89">&#182;</a>
+                <a class="pilcrow" href="#section-90">&#182;</a>
               </div>
               <h2 id="-">测试部分</h2>
 <h4 id="translatetype-any-type">translateType :: [any] → Type</h4>
@@ -2589,11 +2603,11 @@
         </li>
         
         
-        <li id="section-90">
+        <li id="section-91">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-90">&#182;</a>
+                <a class="pilcrow" href="#section-91">&#182;</a>
               </div>
               <p>Existential 类型可以用普通的多态类型模拟</p>
 <p>$\exists \overline x. \rho = \forall Q. (\forall \overline x. \rho \rightarrow Q)\rightarrow Q$</p>
@@ -2610,11 +2624,11 @@
         </li>
         
         
-        <li id="section-91">
+        <li id="section-92">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-91">&#182;</a>
+                <a class="pilcrow" href="#section-92">&#182;</a>
               </div>
               <p>我们目前只知道 $\rightarrow$ 是反变的，因此只处理这一种情况。</p>
 
@@ -2639,11 +2653,11 @@
         </li>
         
         
-        <li id="section-92">
+        <li id="section-93">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-92">&#182;</a>
+                <a class="pilcrow" href="#section-93">&#182;</a>
               </div>
               <h4 id="translate-any-term">translate :: [any] → Term</h4>
 
@@ -2692,11 +2706,11 @@
         </li>
         
         
-        <li id="section-93">
+        <li id="section-94">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-93">&#182;</a>
+                <a class="pilcrow" href="#section-94">&#182;</a>
               </div>
               <p>测试：「全局变量」表</p>
 
@@ -2725,11 +2739,11 @@
         </li>
         
         
-        <li id="section-94">
+        <li id="section-95">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-94">&#182;</a>
+                <a class="pilcrow" href="#section-95">&#182;</a>
               </div>
               <p>测试：程序</p>
 
@@ -2762,11 +2776,11 @@
         </li>
         
         
-        <li id="section-95">
+        <li id="section-96">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-95">&#182;</a>
+                <a class="pilcrow" href="#section-96">&#182;</a>
               </div>
               <p>Pretty-print formatting</p>
 
@@ -2811,11 +2825,11 @@
         </li>
         
         
-        <li id="section-96">
+        <li id="section-97">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-96">&#182;</a>
+                <a class="pilcrow" href="#section-97">&#182;</a>
               </div>
               <p>应当返回：<code>(int * boolean) * list int</code></p>
 
@@ -2826,11 +2840,11 @@
         </li>
         
         
-        <li id="section-97">
+        <li id="section-98">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-97">&#182;</a>
+                <a class="pilcrow" href="#section-98">&#182;</a>
               </div>
               <p>应当返回：程序 a 的已标记版本</p>
 
