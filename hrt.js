@@ -6,7 +6,7 @@
 
 
 const colors = require("colors");
-const stripAnsi = require('strip-ansi');
+const stripAnsi = require("strip-ansi");
 const util = require("util");
 
 // ## 第一部分，环境 $\Gamma$
@@ -119,6 +119,55 @@ function rawNameOfskolmeizedName(n) {
 	return n.replace(/^\.\d+\./, "");
 }
 
+// ### 约制子
+function tag(type) {
+	return function (form) {
+		if (form instanceof Ann) {
+			return new Ann(form.body, type);
+		} else {
+			return new Ann(form, type);
+		}
+	};
+}
+function ctor(x, coercion) { return function (form) {
+		let temp = new Var("?");
+		let coerciedTmp = coercion(temp);
+		if (coerciedTmp instanceof Ann) {
+			if (form instanceof Ann) {
+				return new Ann(form.body, form.type.subst(new Map([["?CTOR" + x, coerciedTmp.type]])));
+			} else {
+				return new Ann(form, new Composite(coerciedTmp.type, new Slot("?ARG" + x)));
+			}
+		} else {
+			return coerciedTmp.subst("?", form);
+		}
+	};
+}
+function arg(x, coercion) { return function (form) {
+		let temp = new Var("?");
+		let coerciedTmp = coercion(temp);
+		if (coerciedTmp instanceof Ann) {
+			if (form instanceof Ann) {
+				return new Ann(form.body, form.type.subst(new Map([["?ARG" + x, coerciedTmp.type]])));
+			} else {
+				return new Ann(form, new Composite(new Slot("?CTOR" + x), coerciedTmp.type));
+			}
+		} else {
+			return coerciedTmp.subst("?", form);
+		}
+	};
+}
+function buildGL(m1, e) {
+	if (e instanceof GreatLambda) {
+		let m2 = new Set(e.quantifiers);
+		for (let k in m1) {
+			m2.add(k);
+		}
+		return new GreatLambda(Array.from(m2), e.body);
+	} else {
+		return new GreatLambda(Array.from(m1), e);
+	}
+}
 
 // ## 第二部分，类型
 // 在我们的系统中，「类型」可以包含四种构造：
@@ -188,14 +237,12 @@ class Type {
 	// 在环境 env 中，实例化当前的多态类型。它会去除顶层的 $\forall$ 符号。
 	/**
 	 * @param {Environment} env
-	 * @returns {{type: Type, coercion: Term}}
+	 * @returns {{type: Type, coercion: Function}}
 	 */
 	instantiate(env) {
-		const x = env.newVar();
-
 		return {
 			type: this,
-			coercion: new Tag(this)
+			coercion: tag(this)
 		};
 	}
 	// #### skolmeize :: *this* Type × Environment → {map: Map string Slot, type: Type, coercion: Coercion}
@@ -204,15 +251,13 @@ class Type {
 	// 一个实例是：$\mathrm{skol}(\forall a.a\rightarrow(\forall b.b\rightarrow b))=\forall ab. a \rightarrow (b \rightarrow b)$
 	/**
 	 * @param {Environment} env
-	 * @returns {{map: Map<string, Slot>, type: Type, coercion: Term}}
+	 * @returns {{map: Map<string, Slot>, type: Type, coercion: Function}}
 	 */
 	skolmeize(env) {
-		const x = env.newVar();
-
 		return {
 			map: new Map(),
 			type: this,
-			coercion: new Tag(this)
+			coercion: tag(this)
 		};
 	}
 	// #### generalize :: *this* Type × Environment × [MetaSlotVal] → ForAll
@@ -247,7 +292,7 @@ class Type {
 	// INFER-INST: $\dfrac{}{\forall \overline a. \rho \le \sim [\overline{a\rightarrow\mathrm{fresh}}]\rho}$
 	/**
 	 * @param{Environment} env
-	 * @returns {{type: Type, coercion: Term}}
+	 * @returns {{type: Type, coercion: Function}}
 	 */
 	instSigmaInfer(env) {
 		return this.instantiate(env);
@@ -257,7 +302,7 @@ class Type {
 	/**
 	 * @param{Environment} env
 	 * @param{Type} expected
-	 * @returns{Term}
+	 * @returns{Function}
 	 */
 	instSigmaCheck(env, expected) {
 		return this.subsCheckRho(env, expected);
@@ -268,7 +313,7 @@ class Type {
 	/**
 	 * @param{Environment} env
 	 * @param{Type} that
-	 * @returns{Term}
+	 * @returns{Function}
 	 */
 	subsCheck(env, that) {
 		// $\sigma_1 \le \sigma_2$ 成立，当且仅当：
@@ -284,17 +329,15 @@ class Type {
 				throw "Subsumption check failed"
 			}
 		}
-
-		const x = env.newVar();
-		return new ALam(x, this, new App(f1, new GreatLambda(
-			Array.from(skolTvs.keys()),
-			new App(f2, new Var(x)))));
+		return function (x) {
+			return f1(buildGL(skolTvs.keys(), f2(x)));
+		};
 	}
 	// ${\rm subsCheckRho}(\sigma, \rho)$ 将会检查是否 $\sigma$ 比 $\rho$ 更加泛化（$\sigma\le\rho$）。
 	/**
 	 * @param{Environment} env
 	 * @param{Type} that
-	 * @returns{Term}
+	 * @returns{Function}
 	 */
 	subsCheckRho(env, that) {
 		if (that instanceof Composite) {
@@ -302,7 +345,7 @@ class Type {
 			return subsCheckComposite(env, that.contravariant, f1, that.fn, a1, that.arg);
 		} else {
 			unify(this, that);
-			return new Tag(this);
+			return tag(this);
 		}
 	}
 }
@@ -314,18 +357,13 @@ function subsCheckComposite(env, contravariant, f1, f2, a1, a2) {
 	let tagf2;
 	if (contravariant) {
 		tagf2 = a2.subsCheck(env, a1);
-		const x = env.newVar("x");
-		const y = env.newVar("y");
 	} else {
 		tagf2 = a1.subsCheckRho(env, a2);
-		const z = env.newVar("z");
 	}
-	const x = env.newVar();
-	const xc = env.newVar("c");
-	const xa = env.newVar("a");
-	return new ALam(x, new Composite(f1, a1),
-		new App(new App(new CtorCoercion(), tagf1),
-			new App(new App(new ArgCoercion(), tagf2), new Var(x))));
+	const z = env.newVar("S");
+	return function (x) {
+		return ctor(z, tagf1)(arg(z, tagf2)(x));
+	};
 }
 
 // #### generateBinder :: ref number × Set string → string
@@ -440,16 +478,19 @@ class Composite extends Type {
 		let {map: m1, type: t1, coercion: f1} = this.fn.skolmeize(env);
 		if (this.contravariant) {
 			//   - 如果这个类型是反变的，保留其 arg 部分；
-			const skolRho = new Composite(t1, this.arg, this.contravariant);
-			const x = env.newVar("S");
+			const argtype = this.arg;
+			const skolRho = new Composite(t1, argtype, this.contravariant);
+			const z = env.newVar("S");
 			return {
 				map: m1,
 				type: skolRho,
-				coercion: new ALam(x, new ForAll(m1, skolRho),
-					new GreatLambda(Array.from(m1.keys()),
-						new App(
-							new App(new CtorCoercion(), f1),
-							new Var(x))))
+				coercion: function (x) {
+					if (m1.size) {
+						return buildGL(m1.keys(), ctor(z, f1)(arg(z, tag(argtype))(x)));
+					} else {
+						return ctor(z, f1)(arg(z, tag(argtype))(x));
+					}
+				}
 			};
 		} else {
 			//   - 如果这个类型是协变的，展开其 arg 部分。
@@ -458,16 +499,17 @@ class Composite extends Type {
 				m2.set(k, v);
 			}
 			const skolRho = new Composite(t1, t2, this.contravariant);
-			const x = env.newVar("R");
+			const z = env.newVar("R");
 			return {
 				map: m2,
 				type: skolRho,
-				coercion: new ALam(x, new ForAll(m2, skolRho),
-					new GreatLambda(Array.from(m2.keys()),
-						new App(
-							new App(new CtorCoercion(), f1),
-							new App(new App(new ArgCoercion(), f2),
-								new Var(x)))))
+				coercion: function (x) {
+					if (m2.size) {
+						return buildGL(m2.keys(), ctor(z, f1)(arg(z, f2)(x)));
+					} else {
+						return ctor(z, f1)(arg(z, f2)(x));
+					}
+				}
 			};
 		}
 	}
@@ -533,10 +575,23 @@ class ForAll extends Type {
 			m.set(q, new MetaSlot(env.newMetaSlotVal()));
 		}
 		const rho = this.body.subst(m);
-		const x = env.newVar();
-		const coercion = new ALam(x, this, new App(new Inst(m), new Var(x)));
 		return {
-			type: rho, coercion: coercion
+			type: rho,
+			coercion: function (x) {
+				if (m.size) {
+					if (x instanceof App && x.fn instanceof Inst) {
+						let m1 = x.fn.args;
+						for (let [k, v] of m.entries()) {
+							m1.set(k, v);
+						}
+						return new App(new Inst(m1), x.arg);
+					} else {
+						return new App(new Inst(m), x);
+					}
+				} else {
+					return x;
+				}
+			}
 		};
 	}
 	// 多态类型的深斯科伦化会合并内外两层的变量表。
@@ -552,18 +607,21 @@ class ForAll extends Type {
 			m.set(sv, ss);
 			mSub.set(q, ss);
 		}
-		let {map: m1, type: t1, coercion: f} = this.body.subst(mSub).skolmeize(env);
+		let {map: mBody, type: t1, coercion: f} = this.body.subst(mSub).skolmeize(env);
+		let m1 = new Map(mBody);
 		for (let [k, v] of m.entries()) {
 			m1.set(k, v);
 		}
-		const x = env.newVar();
 		return {
 			map: m1,
 			type: t1,
-			coercion: new ALam(x,
-				new ForAll(m1, t1),
-				new GreatLambda(Array.from(m1.keys()),
-					new App(f, new Var(x))))
+			coercion: function (x) {
+				if (m.size) {
+					return buildGL(mSub.keys(), f(new App(new Inst(mSub), x)));
+				} else {
+					return f(x);
+				}
+			}
 		};
 	}
 
@@ -577,22 +635,27 @@ class ForAll extends Type {
 	subsCheckRho(env, that) {
 		let {type:rho1, coercion:t1} = this.instantiate(env);
 		const f = rho1.subsCheckRho(env, that);
-		const x = env.newVar();
-		return new ALam(x, this, new App(f, new App(t1.body.fn, new Var(x))));
+		return function (x) {
+			return f(t1(x));
+		};
 	}
 }
 
 // ### Meta Slot，推理过程中的未决议类型
 class MetaSlot extends Type {
 	/**
-	 * @param {MetaSlotVal} arg - ArgCoercion
+	 * @param {MetaSlotVal} arg
 	 */
 	constructor(arg) {
 		super();
 		this.arg = arg;
 	}
 	format() {
-		return ("?" + this.arg.id).red.bold;
+		if (this.arg) {
+			return ("?" + this.arg.id).red.bold;
+		} else {
+			return ("??").red.bold;
+		}
 	}
 	_getMetaSlots(a) {
 		if (!a.has(this.arg.id)) {
@@ -600,7 +663,7 @@ class MetaSlot extends Type {
 		}
 	}
 	zonk() {
-		if (this.arg.typeRef.val) {
+		if (this.arg && this.arg.typeRef.val) {
 			let t1 = this.arg.typeRef.val.zonk();
 			this.arg.typeRef.val = t1;
 			return t1;
@@ -765,11 +828,9 @@ class Term {
 	subst(id, replacement) {
 		return this;
 	}
-	// #### betaRedex :: *this* Term → Term
-	// 进行 $\beta$ 规约。此过程主要用于清理约制项，将他们并入程序中。
-	betaRedex() {
-		return this;
-	}
+	/**
+	 * @param{Map<string, Type>} m
+	 */
 	// #### checkRho :: *this* Term × Environment × Type → Tagged
 	// 在环境 env 中检查当前表达式是否符合 $\rho$ 类型 type
 	//
@@ -817,7 +878,11 @@ class Term {
 				throw "Type is not polymorphic enough"
 			}
 		}
-		return new App(f, new GreatLambda(mvs, e));
+		if (mvs.size) {
+			return f(buildGL(mvs.keys(), e));
+		} else {
+			return e;
+		}
 	}
 
 	// #### inferSigma :: *this* Term × Environment → {type: Type, tagged: Tagged}
@@ -837,10 +902,17 @@ class Term {
 			resMsvs.delete(id);
 		}
 		const polyTy = expTy.generalize(env, Array.from(resMsvs.values()));
-		return {
-			type: polyTy,
-			tagged: new GreatLambda(polyTy.quantifiers, tagged)
-		};
+		if (polyTy.quantifiers.length) {
+			return {
+				type: polyTy,
+				tagged: buildGL(polyTy.quantifiers, tagged)
+			};
+		} else {
+			return {
+				type: polyTy,
+				tagged: tagged
+			};
+		}
 	}
 }
 // ### 直接量
@@ -918,12 +990,12 @@ class Var extends Term {
 	// CHECK-VAR: $\dfrac{\sigma\le\rho}{\Gamma, x:\sigma\vdash x:\rho}$
 	_checkRho(env, expected) {
 		const f = env.lookup(this.name).instSigmaCheck(env, expected);
-		return new App(f, this);
+		return f(this);
 	}
 	// INFER-VAR: $\dfrac{\sigma\le\sim\rho}{\Gamma, x:\sigma\vdash x:\sim\rho}$
 	_inferRho(env) {
 		const {type, coercion: f} = env.lookup(this.name).instSigmaInfer(env);
-		return {type, tagged: new App(f, this)};
+		return {type, tagged: f(this)};
 	}
 }
 // ### 函数调用
@@ -944,27 +1016,6 @@ class App extends Term {
 			return [this.fn.format(), this.arg.format()];
 		}
 	}
-	betaRedex() {
-		this.fn = this.fn.betaRedex();
-		this.arg = this.arg.betaRedex();
-		if (this.fn instanceof Tag) { // We do not really "tag" something, just leave its argument
-			return this.arg;
-		} else if (this.fn instanceof App && (this.fn.fn instanceof CtorCoercion || this.fn.fn instanceof ArgCoercion)) {
-			return new App(this.fn.arg, this.arg).betaRedex();
-		} else if (this.fn instanceof Inst && !this.fn.args.size) {
-			return this.arg;
-		} else if (this.fn instanceof Inst && this.arg instanceof App && this.arg.fn instanceof Inst) {
-			let m = new Map(this.fn.args);
-			for (let [k, v] of this.arg.fn.args) {
-				m.set(k, v);
-			}
-			return new App(new Inst(m), this.arg.arg);
-		} else if (this.fn instanceof ALam) {
-			return this.fn.body.subst(this.fn.param, new App(new Tag(this.fn.type), this.arg)).betaRedex();
-		} else {
-			return this;
-		}
-	}
 	/**
 	 * @param{string} id
 	 * @param{Term} replacement
@@ -980,7 +1031,7 @@ class App extends Term {
 		const [argTy, resTy] = unifyFun(funTy, env);
 		const e2 = this.arg.checkSigma(env, argTy);
 		const f = resTy.instSigmaCheck(env, expected);
-		return new App(f, new App(e1, e2));
+		return f(new App(e1, e2));
 	}
 	// INFER-APP: $\dfrac{\Gamma\vdash t:\sim(\sigma \rightarrow \sigma')\quad\Gamma\vdash^* u:\sigma\quad \sigma'\le\sim\rho'}{\Gamma\vdash t\ u :\sim \rho}$
 	_inferRho(env) {
@@ -988,7 +1039,7 @@ class App extends Term {
 		const [argTy, resTy] = unifyFun(funTy, env);
 		const e2 = this.arg.checkSigma(env, argTy);
 		const {type: t, coercion: f} = resTy.instSigmaInfer(env);
-		return {type: t, tagged: new App(f, new App(e1, e2))};
+		return {type: t, tagged: f(new App(e1, e2))};
 	}
 }
 // ### 函数抽象
@@ -1004,10 +1055,6 @@ class Lam extends Term {
 	}
 	format() {
 		return ["lambda".yellow.bold, this.param, this.body.format()];
-	}
-	betaRedex() {
-		this.body = this.body.betaRedex();
-		return this;
 	}
 	/**
 	 * @param{string} id
@@ -1063,10 +1110,6 @@ class ALam extends Term {
 	format() {
 		return ["lambda".yellow.bold, ["::", this.param, this.type.zonk().format()], this.body.format()];
 	}
-	betaRedex() {
-		this.body = this.body.betaRedex();
-		return this;
-	}
 	/**
 	 * @param{string} id
 	 * @param{Term} replacement
@@ -1118,18 +1161,11 @@ class Let extends Term {
 		this.terms = terms;
 		this.body = body;
 	}
-	betaRedex() {
-		for (let term of this.terms) {
-			term.bind = term.bind.betaRedex();
-		}
-		this.body = this.body.betaRedex();
-		return this;
-	}
 	format() {
 		return ["let".yellow.bold].concat(
-			this.terms.map(({name, type, bind}) => type 
-				? ['=', ['::', name, type.format()], bind.format()] 
-				: ['=', name, bind.format()]),
+			this.terms.map(({name, type, bind}) => type
+				? ["=", ["::", name, type.format()], bind.format()]
+				: ["=", name, bind.format()]),
 			[this.body.format()]);
 	}
 	/**
@@ -1193,18 +1229,11 @@ class LetRec extends Term {
 		this.terms = terms;
 		this.body = body;
 	}
-	betaRedex() {
-		for (let term of this.terms) {
-			term.bind = term.bind.betaRedex();
-		}
-		this.body = this.body.betaRedex();
-		return this;
-	}
 	format() {
 		return ["letrec".yellow.bold].concat(
-			this.terms.map(({name, type, bind}) => type 
-				? ['=', ['::', name, type.format()], bind.format()] 
-				: ['=', name, bind.format()]),
+			this.terms.map(({name, type, bind}) => type
+				? ["=", ["::", name, type.format()], bind.format()]
+				: ["=", name, bind.format()]),
 			[this.body.format()]);
 	}
 	/**
@@ -1296,19 +1325,8 @@ class Ann extends Term {
 		this.body = body;
 		this.type = type;
 	}
-	betaRedex() {
-		this.body = this.body.betaRedex();
-		while(this.body instanceof Ann){
-			this.body = this.body.body;
-		}
-		return this;
-	}
 	format() {
-		if (this.body instanceof Var) {
-			return ["::", this.body.format(), this.type.zonk().format()];
-		} else {
-			return this.body.format();
-		}
+		return ["::", this.body.format(), this.type.zonk().format()];
 	}
 	subst(name, replacement) {
 		return new Ann(this.body.subst(name, replacement), this.type);
@@ -1321,7 +1339,7 @@ class Ann extends Term {
 	_checkRho(env, expected) {
 		const e = this.body.checkSigma(env, this.type);
 		const f = this.type.instSigmaCheck(env, expected);
-		return new App(f, e);
+		return f(e);
 	}
 	// INFER-ANN: $\dfrac{\Gamma\vdash^* t:\sigma \quad \sigma\le\sim\rho}{\Gamma\vdash(t:\sigma):\sim\rho}$
 	/**
@@ -1331,7 +1349,7 @@ class Ann extends Term {
 	_inferRho(env) {
 		const e = this.body.checkSigma(env, this.type);
 		const {type, coercion:f} = this.type.instSigmaInfer(env);
-		return {type, tagged: new App(f, e)};
+		return {type, tagged: f(e)};
 	}
 }
 // 以下的项目为 System F 的高阶构造，它们主要用于构造约制子。
@@ -1346,23 +1364,6 @@ class GreatLambda extends Term {
 		super();
 		this.quantifiers = quantifiers;
 		this.body = body;
-	}
-	betaRedex() {
-		this.body = this.body.betaRedex();
-		while(this.body instanceof Ann){
-			this.body = this.body.body;
-		}
-		if (!this.quantifiers.length) {
-			return this.body;
-		} else if (this.body instanceof GreatLambda) {
-			const s = new Set(this.body.quantifiers);
-			for (let k of this.quantifiers) {
-				s.add(k);
-			}
-			return new GreatLambda(Array.from(s), this.body.body);
-		} else {
-			return this;
-		}
 	}
 	format() {
 		if (this.quantifiers.length) {
@@ -1380,22 +1381,6 @@ class GreatLambda extends Term {
 		return new GreatLambda(this.quantifiers, this.body.subst(id, replacement));
 	}
 }
-// ### Tagging term，「指定」一个类型的行为。$\mathrm{Tag}(\sigma)=\lambda x:\sigma.x$
-class Tag extends Term {
-	/**
-	 * @param {Type} type
-	 */
-	constructor(type) {
-		super();
-		this.type = type;
-	}
-	isAtomic() {
-		return true;
-	}
-	format() {
-		return ["tag".yellow.bold, this.type.zonk().format()];
-	}
-}
 // ### System-F 显式类型实例化。$\mathrm{Inst}(\alpha\rightarrow\rho)=\lambda x.x^{\{\alpha=\rho\}}$
 class Inst extends Term {
 	/**
@@ -1410,41 +1395,11 @@ class Inst extends Term {
 		return true;
 	}
 	format() {
-		if (this.args.size) {
-			let buf = [];
-			for (let [k, v] of this.args) {
-				buf.push(['=', new Slot(k).format(), v.zonk().format()]);
-			}
-			return ["inst".yellow.bold].concat(buf);
-		} else {
-			return "";
+		let buf = [];
+		for (let [k, v] of this.args) {
+			buf.push(["=", new Slot(k).format(), v.zonk().format()]);
 		}
-	}
-}
-// ### System-F 的约制子特殊形式
-// $\mathrm{ctor}\ \theta\ x$：让约制子 $\theta$ 检查复合类型对象 $x$ 类型的构造器部分
-//
-// $\mathrm{arg}\ \theta\ x$：让约制子 $\theta$ 检查复合类型对象 $x$ 类型的参数部分
-class CtorCoercion extends Term {
-	constructor() {
-		super();
-	}
-	isAtomic() {
-		return true;
-	}
-	format() {
-		return ("<CTOR>").red;
-	}
-}
-class ArgCoercion extends Term {
-	constructor() {
-		super();
-	}
-	isAtomic() {
-		return true;
-	}
-	format() {
-		return ("<ARG>").cyan;
+		return ["inst".yellow.bold].concat(buf);
 	}
 }
 
@@ -1576,11 +1531,11 @@ const a = translate(
 
 
 // Pretty-print formatting
-const COLORS = ['grey', 'blue', 'cyan'];
+const COLORS = ["grey", "blue", "cyan"];
 const COLUMNS = 100;
 function formatToStr(form, depth, infix, compact) {
 	if (typeof form === "string") return form;
-	if (!infix && form.length === 3 && typeof form[0] === "string" && !/[\wΛ]/.test(stripAnsi( form[0]))) {
+	if (!infix && form.length === 3 && typeof form[0] === "string" && !/[\wΛ]/.test(stripAnsi(form[0]))) {
 		return formatToStr([form[1], form[0].magenta, form[2]], depth, true, compact);
 	}
 	const shorts = [];
@@ -1591,8 +1546,8 @@ function formatToStr(form, depth, infix, compact) {
 	}
 	if (compact || shortlen < COLUMNS) {
 		return (infix ? "(" : "[")[COLORS[depth % COLORS.length]]
-			+ shorts.join(" ") 
-			+ (infix ? ")" : "]")[COLORS[depth % COLORS.length]];
+		+ shorts.join(" ")
+		+ (infix ? ")" : "]")[COLORS[depth % COLORS.length]];
 	} else {
 		let buf = (infix ? "(" : "[")[COLORS[depth % COLORS.length]];
 		let lensofar = 0, indent = false;
@@ -1607,13 +1562,11 @@ function formatToStr(form, depth, infix, compact) {
 
 console.log("Program:", formatToStr(a.format(), 1, false));
 console.log("\nEnvironment:");
-for(let [k, v] of env.variables.entries()){
-	console.log('    ', k, '::', formatToStr(v.format(), 1, false));
+for (let [k, v] of env.variables.entries()) {
+	console.log("    ", k, "::", formatToStr(v.format(), 1, false));
 }
 const {type, tagged} = a.inferSigma(env);
 // 应当返回：`(int * boolean) * list int`
 console.log("\nType:", formatToStr(type.format(), 1, false));
-// 应当返回：程序 a 的约制版本（非常长的，包含 CTOR 和 ARG Tagging）
-/* console.log("\nSystem F Notations: ", formatToStr(tagged.format(), 1, false)); */
-// 应当返回：程序 a 的约制版本，已规约的
-console.log("\nSystem F Redex: ", formatToStr(tagged.betaRedex().format(), 1, false));
+// 应当返回：程序 a 的约制版本
+console.log("\nSystem F Notations: ", formatToStr(tagged.format(), 1, false));
