@@ -552,7 +552,8 @@ class ForAll extends Type {
 	}
 	format() {
 		if (this.quantifiers.length) {
-			return ["forall".cyan.bold, this.quantifiers.map(x => new Slot(x).format()), this.body.format()];
+			return ["forall".cyan.bold, 
+				this.quantifiers.map(x => new Slot(x).format()), this.body.format()];
 		} else {
 			return this.body.format();
 		}
@@ -629,9 +630,9 @@ class ForAll extends Type {
 			map: m1,
 			type: t1,
 			coercion: function (x) {
-				const mRev = new Map(Array.from(mSub).map(([k, v])=>[v.name, new Slot(k)]));
+				const mRev = new Map(Array.from(mSub).map(([k, v]) => [v.name, new Slot(k)]));
 				if (m.size) {
-					return buildGL(mSub.keys(),new Inst(f(x), mRev));
+					return buildGL(mSub.keys(), new Inst(f(x), mRev));
 				} else {
 					return f(x);
 				}
@@ -1340,7 +1341,7 @@ class Ann extends Term {
 	}
 	format() {
 		return this.body.format();
-		//return ["::", this.body.format(), this.type.zonk().format()];
+	// return ["::", this.body.format(), this.type.zonk().format()];
 	}
 	subst(name, replacement) {
 		return new Ann(this.body.subst(name, replacement), this.type);
@@ -1412,6 +1413,14 @@ class Inst extends Term {
 			buf.push(["=", new Slot(k).format(), v.zonk().format()]);
 		}
 		return ["inst".yellow.bold, this.body.format()].concat(buf);
+	}
+	/**
+	 * @param{string} id
+	 * @param{Term} replacement
+	 * @returns{Term}
+	 */
+	subst(name, replacement) {
+		return new Inst(this.body.subst(name, replacement), this.args);
 	}
 }
 

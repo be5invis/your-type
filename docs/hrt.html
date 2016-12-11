@@ -1135,7 +1135,8 @@
 	}
 	format() {
 		<span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.quantifiers.length) {
-			<span class="hljs-keyword">return</span> [<span class="hljs-string">"forall"</span>.cyan.bold, <span class="hljs-keyword">this</span>.quantifiers.map(<span class="hljs-function"><span class="hljs-params">x</span> =&gt;</span> <span class="hljs-keyword">new</span> Slot(x).format()), <span class="hljs-keyword">this</span>.body.format()];
+			<span class="hljs-keyword">return</span> [<span class="hljs-string">"forall"</span>.cyan.bold, 
+				<span class="hljs-keyword">this</span>.quantifiers.map(<span class="hljs-function"><span class="hljs-params">x</span> =&gt;</span> <span class="hljs-keyword">new</span> Slot(x).format()), <span class="hljs-keyword">this</span>.body.format()];
 		} <span class="hljs-keyword">else</span> {
 			<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.body.format();
 		}
@@ -1251,9 +1252,9 @@
 			<span class="hljs-attr">map</span>: m1,
 			<span class="hljs-attr">type</span>: t1,
 			<span class="hljs-attr">coercion</span>: <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">x</span>) </span>{
-				<span class="hljs-keyword">const</span> mRev = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Map</span>(<span class="hljs-built_in">Array</span>.from(mSub).map(<span class="hljs-function">(<span class="hljs-params">[k, v]</span>)=&gt;</span>[v.name, <span class="hljs-keyword">new</span> Slot(k)]));
+				<span class="hljs-keyword">const</span> mRev = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Map</span>(<span class="hljs-built_in">Array</span>.from(mSub).map(<span class="hljs-function">(<span class="hljs-params">[k, v]</span>) =&gt;</span> [v.name, <span class="hljs-keyword">new</span> Slot(k)]));
 				<span class="hljs-keyword">if</span> (m.size) {
-					<span class="hljs-keyword">return</span> buildGL(mSub.keys(),<span class="hljs-keyword">new</span> Inst(f(x), mRev));
+					<span class="hljs-keyword">return</span> buildGL(mSub.keys(), <span class="hljs-keyword">new</span> Inst(f(x), mRev));
 				} <span class="hljs-keyword">else</span> {
 					<span class="hljs-keyword">return</span> f(x);
 				}
@@ -2569,6 +2570,14 @@
 			buf.push([<span class="hljs-string">"="</span>, <span class="hljs-keyword">new</span> Slot(k).format(), v.zonk().format()]);
 		}
 		<span class="hljs-keyword">return</span> [<span class="hljs-string">"inst"</span>.yellow.bold, <span class="hljs-keyword">this</span>.body.format()].concat(buf);
+	}
+	<span class="hljs-comment">/**
+	 * @param{string} id
+	 * @param{Term} replacement
+	 * @returns{Term}
+	 */</span>
+	subst(name, replacement) {
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Inst(<span class="hljs-keyword">this</span>.body.subst(name, replacement), <span class="hljs-keyword">this</span>.args);
 	}
 }</pre></div></div>
             
