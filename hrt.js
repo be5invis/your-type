@@ -119,7 +119,10 @@ function rawNameOfskolmeizedName(n) {
 	return n.replace(/^\.\d+\./, "");
 }
 
-// ### 约制子
+// ### 约制子（Coercion）
+// 为了在类型检查的同时完成标记类型信息，我们使用约制子（Coercion）来处理项。约制子是一个编译时函数，它将一个项变换为已标记类型信息的形式。
+// #### tag :: Type → Term → Term
+// 为某个项附加类型信息
 function tag(type) {
 	return function (form) {
 		if (form instanceof Ann) {
@@ -129,34 +132,44 @@ function tag(type) {
 		}
 	};
 }
+// #### ctor :: string × Coercion → Term → Term
+// 约制某个复合类型项的构造器部分
 function ctor(x, coercion) { return function (form) {
 		let temp = new Var("?");
 		let coerciedTmp = coercion(temp);
 		if (coerciedTmp instanceof Ann) {
 			if (form instanceof Ann) {
-				return new Ann(form.body, form.type.subst(new Map([["?CTOR" + x, coerciedTmp.type]])));
+				return new Ann(form.body,
+					form.type.subst(new Map([["?CTOR" + x, coerciedTmp.type]])));
 			} else {
-				return new Ann(form, new Composite(coerciedTmp.type, new Slot("?ARG" + x)));
+				return new Ann(form,
+					new Composite(coerciedTmp.type, new Slot("?ARG" + x)));
 			}
 		} else {
 			return coerciedTmp.subst("?", form);
 		}
 	};
 }
+// #### arg :: string × Coercion → Term → Term
+// 约制某个复合类型项的参数部分
 function arg(x, coercion) { return function (form) {
 		let temp = new Var("?");
 		let coerciedTmp = coercion(temp);
 		if (coerciedTmp instanceof Ann) {
 			if (form instanceof Ann) {
-				return new Ann(form.body, form.type.subst(new Map([["?ARG" + x, coerciedTmp.type]])));
+				return new Ann(form.body,
+					form.type.subst(new Map([["?ARG" + x, coerciedTmp.type]])));
 			} else {
-				return new Ann(form, new Composite(new Slot("?CTOR" + x), coerciedTmp.type));
+				return new Ann(form,
+					new Composite(new Slot("?CTOR" + x), coerciedTmp.type));
 			}
 		} else {
 			return coerciedTmp.subst("?", form);
 		}
 	};
 }
+// #### buildGL :: Map string Type × Term → Term
+// 构造一个 System-F 的 $\Lambda$ 项
 function buildGL(m1, e) {
 	if (e instanceof GreatLambda) {
 		let m2 = new Set(e.quantifiers);
@@ -177,7 +190,7 @@ function buildGL(m1, e) {
 // * Composite，表示一个复合类型，如 $\rm list\ int$。函数类型是一种二级复合。
 // * ForAll，表示一个多态量化 $\forall \overline\alpha. t$。
 // 
-// 此外在推理过程中，会涉及一种 Meta Slot，它代表一个尚未完全决议的类型。使用这种方式处理推理中的中间结果最早可见于 Jones 的另一篇文献，*Boxy Types: Inference for Higher-Rank Types and Impredicativity*。
+// 此外在推理过程中，会涉及一种 Meta Slot，它代表一个尚未完全决议的类型。使用这种方式处理推理中的中间结果可见于 Jones 的另一篇文献，*Boxy Types: Inference for Higher-Rank Types and Impredicativity*。
 // 
 // 我们将类型分为 $\sigma$, $\rho$, $\tau$ 三类，它们满足：
 // * $\tau \rightarrow \mathrm{Primitive}\ |\  a\ |\ \tau_1 \tau_2$
@@ -187,7 +200,7 @@ function buildGL(m1, e) {
 // 可以看出，$\sigma$ 类型为直接包含多态的类型，$\rho$ 类型则为嵌有多态结构的复合类型。在传统的 Hindley-Milner 系统中，$\rho$ 类型的第二种形式并不允许，它和 $\tau$ 类型完全等价。
 class Type {
 	constructor() {}
-	// #### format :: *this* Type → string
+	// #### format :: *this* Type → ArrayForm
 	format() {}
 	// #### getMetaSlots :: *this* Type → Map number MetaSlot
 	// 获取当前类型中所有出现的 Meta slot。返回一个 id 到 meta slot 的映射。根据 Meta slot value 的定义，任何两个 id 相同的 Meta slot 都视作相等。
@@ -810,13 +823,12 @@ function unifyComposite(type, env) {
 
 // ## 第四部分，主推理算法
 // 由于高阶类型的介入，Damas-Hindley-Milner 系统中的单一「推理」方法需要拆分为一对方法，`infer` 和 `check`；它们会再根据所处理的类型（$\sigma$ 或者 $\rho$ 类型），再各自进行拆分，因此最终得到四个方法：`inferRho`, `checkRho`, `inferSigma`, `checkSigma`。
-//
-// 在进行类型检查的时候，我们还会把当前项用一个约制（Coercion）项包装，我们称这种表达式是标记的（Tagged）。约制项目是一个合法的 System F 函数，它会显式标注所有的多态抽象和实例化过程。所有的约制项经过 $\beta$ 规约之后可以达到「给普通函数加类型标注」一样的效果。
 class Term {
 	constructor() {}
 	isAtomic() {
 		return false;
 	}
+	// format :: *this* → ArrayForm
 	format() {}
 	// #### subst :: *this* Term × string × Term → Term
 	// 替换一个变量名为一个其他形式。
@@ -1568,5 +1580,5 @@ for (let [k, v] of env.variables.entries()) {
 const {type, tagged} = a.inferSigma(env);
 // 应当返回：`(int * boolean) * list int`
 console.log("\nType:", formatToStr(type.format(), 1, false));
-// 应当返回：程序 a 的约制版本
+// 应当返回：程序 a 的已标记版本
 console.log("\nSystem F Notations: ", formatToStr(tagged.format(), 1, false));
