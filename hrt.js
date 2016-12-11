@@ -1393,7 +1393,7 @@ class Tag extends Term {
 		return true;
 	}
 	format() {
-		return ["as".yellow.bold, this.type.zonk().format()];
+		return ["tag".yellow.bold, this.type.zonk().format()];
 	}
 }
 // ### System-F 显式类型实例化。$\mathrm{Inst}(\alpha\rightarrow\rho)=\lambda x.x^{\{\alpha=\rho\}}$
@@ -1577,6 +1577,7 @@ const a = translate(
 
 // Pretty-print formatting
 const COLORS = ['grey', 'blue', 'cyan'];
+const COLUMNS = 100;
 function formatToStr(form, depth, infix, compact) {
 	if (typeof form === "string") return form;
 	if (!infix && form.length === 3 && typeof form[0] === "string" && !/[\wΛ]/.test(stripAnsi( form[0]))) {
@@ -1588,7 +1589,7 @@ function formatToStr(form, depth, infix, compact) {
 		shorts.push(formatToStr(subform, depth + 1, false, compact));
 		shortlen += stripAnsi(shorts[shorts.length - 1]).length;
 	}
-	if (compact || shortlen < 80) {
+	if (compact || shortlen < COLUMNS) {
 		return (infix ? "(" : "[")[COLORS[depth % COLORS.length]]
 			+ shorts.join(" ") 
 			+ (infix ? ")" : "]")[COLORS[depth % COLORS.length]];
@@ -1597,7 +1598,7 @@ function formatToStr(form, depth, infix, compact) {
 		let lensofar = 0, indent = false;
 		for (let j = 0; j < shorts.length; j++) {
 			lensofar += stripAnsi(shorts[j]).length;
-			indent = indent || lensofar >= 80;
+			indent = indent || lensofar >= COLUMNS;
 			buf += ((indent && j) ? "\n" + "  ".repeat(depth) : " ") + shorts[j];
 		}
 		return buf + (infix ? ")" : "]")[COLORS[depth % COLORS.length]];
@@ -1612,7 +1613,7 @@ for(let [k, v] of env.variables.entries()){
 const {type, tagged} = a.inferSigma(env);
 // 应当返回：`(int * boolean) * list int`
 console.log("\nType:", formatToStr(type.format(), 1, false));
-// 应当返回：程序 a 的约制版本（非常长的）
-/* console.log("\nSystem F Notations: ", formatToStr(tagged.format(), 1, false, true)); */
+// 应当返回：程序 a 的约制版本（非常长的，包含 CTOR 和 ARG Tagging）
+/* console.log("\nSystem F Notations: ", formatToStr(tagged.format(), 1, false)); */
 // 应当返回：程序 a 的约制版本，已规约的
 console.log("\nSystem F Redex: ", formatToStr(tagged.betaRedex().format(), 1, false));

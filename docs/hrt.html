@@ -2484,7 +2484,7 @@
 		<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>;
 	}
 	format() {
-		<span class="hljs-keyword">return</span> [<span class="hljs-string">"as"</span>.yellow.bold, <span class="hljs-keyword">this</span>.type.zonk().format()];
+		<span class="hljs-keyword">return</span> [<span class="hljs-string">"tag"</span>.yellow.bold, <span class="hljs-keyword">this</span>.type.zonk().format()];
 	}
 }</pre></div></div>
             
@@ -2777,6 +2777,7 @@
             </div>
             
             <div class="content"><div class='highlight'><pre><span class="hljs-keyword">const</span> COLORS = [<span class="hljs-string">'grey'</span>, <span class="hljs-string">'blue'</span>, <span class="hljs-string">'cyan'</span>];
+<span class="hljs-keyword">const</span> COLUMNS = <span class="hljs-number">100</span>;
 <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">formatToStr</span>(<span class="hljs-params">form, depth, infix, compact</span>) </span>{
 	<span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> form === <span class="hljs-string">"string"</span>) <span class="hljs-keyword">return</span> form;
 	<span class="hljs-keyword">if</span> (!infix &amp;&amp; form.length === <span class="hljs-number">3</span> &amp;&amp; <span class="hljs-keyword">typeof</span> form[<span class="hljs-number">0</span>] === <span class="hljs-string">"string"</span> &amp;&amp; !<span class="hljs-regexp">/[\wΛ]/</span>.test(stripAnsi( form[<span class="hljs-number">0</span>]))) {
@@ -2788,7 +2789,7 @@
 		shorts.push(formatToStr(subform, depth + <span class="hljs-number">1</span>, <span class="hljs-literal">false</span>, compact));
 		shortlen += stripAnsi(shorts[shorts.length - <span class="hljs-number">1</span>]).length;
 	}
-	<span class="hljs-keyword">if</span> (compact || shortlen &lt; <span class="hljs-number">80</span>) {
+	<span class="hljs-keyword">if</span> (compact || shortlen &lt; COLUMNS) {
 		<span class="hljs-keyword">return</span> (infix ? <span class="hljs-string">"("</span> : <span class="hljs-string">"["</span>)[COLORS[depth % COLORS.length]]
 			+ shorts.join(<span class="hljs-string">" "</span>) 
 			+ (infix ? <span class="hljs-string">")"</span> : <span class="hljs-string">"]"</span>)[COLORS[depth % COLORS.length]];
@@ -2797,7 +2798,7 @@
 		<span class="hljs-keyword">let</span> lensofar = <span class="hljs-number">0</span>, indent = <span class="hljs-literal">false</span>;
 		<span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> j = <span class="hljs-number">0</span>; j &lt; shorts.length; j++) {
 			lensofar += stripAnsi(shorts[j]).length;
-			indent = indent || lensofar &gt;= <span class="hljs-number">80</span>;
+			indent = indent || lensofar &gt;= COLUMNS;
 			buf += ((indent &amp;&amp; j) ? <span class="hljs-string">"\n"</span> + <span class="hljs-string">"  "</span>.repeat(depth) : <span class="hljs-string">" "</span>) + shorts[j];
 		}
 		<span class="hljs-keyword">return</span> buf + (infix ? <span class="hljs-string">")"</span> : <span class="hljs-string">"]"</span>)[COLORS[depth % COLORS.length]];
@@ -2835,11 +2836,11 @@
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-95">&#182;</a>
               </div>
-              <p>应当返回：程序 a 的约制版本（非常长的）</p>
+              <p>应当返回：程序 a 的约制版本（非常长的，包含 CTOR 和 ARG Tagging）</p>
 
             </div>
             
-            <div class="content"><div class='highlight'><pre><span class="hljs-comment">/* console.log("\nSystem F Notations: ", formatToStr(tagged.format(), 1, false, true)); */</span></pre></div></div>
+            <div class="content"><div class='highlight'><pre><span class="hljs-comment">/* console.log("\nSystem F Notations: ", formatToStr(tagged.format(), 1, false)); */</span></pre></div></div>
             
         </li>
         
