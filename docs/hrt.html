@@ -315,10 +315,10 @@
             
             <div class="content"><div class='highlight'><pre><span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">tag</span>(<span class="hljs-params">type</span>) </span>{
 	<span class="hljs-keyword">return</span> <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">form</span>) </span>{
-		<span class="hljs-keyword">if</span> (form <span class="hljs-keyword">instanceof</span> Ann) {
-			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Ann(form.body, type);
+		<span class="hljs-keyword">if</span> (form <span class="hljs-keyword">instanceof</span> Annotate) {
+			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Annotate(form.body, type);
 		} <span class="hljs-keyword">else</span> {
-			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Ann(form, type);
+			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Annotate(form, type);
 		}
 	};
 }</pre></div></div>
@@ -340,12 +340,12 @@
             <div class="content"><div class='highlight'><pre><span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">ctor</span>(<span class="hljs-params">x, coercion</span>) </span>{ <span class="hljs-keyword">return</span> <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">form</span>) </span>{
 		<span class="hljs-keyword">let</span> temp = <span class="hljs-keyword">new</span> Var(<span class="hljs-string">"?"</span>);
 		<span class="hljs-keyword">let</span> coerciedTmp = coercion(temp);
-		<span class="hljs-keyword">if</span> (coerciedTmp <span class="hljs-keyword">instanceof</span> Ann) {
-			<span class="hljs-keyword">if</span> (form <span class="hljs-keyword">instanceof</span> Ann) {
-				<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Ann(form.body,
+		<span class="hljs-keyword">if</span> (coerciedTmp <span class="hljs-keyword">instanceof</span> Annotate) {
+			<span class="hljs-keyword">if</span> (form <span class="hljs-keyword">instanceof</span> Annotate) {
+				<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Annotate(form.body,
 					form.type.subst(<span class="hljs-keyword">new</span> <span class="hljs-built_in">Map</span>([[<span class="hljs-string">"?CTOR"</span> + x, coerciedTmp.type]])));
 			} <span class="hljs-keyword">else</span> {
-				<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Ann(form,
+				<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Annotate(form,
 					<span class="hljs-keyword">new</span> Composite(coerciedTmp.type, <span class="hljs-keyword">new</span> Slot(<span class="hljs-string">"?ARG"</span> + x)));
 			}
 		} <span class="hljs-keyword">else</span> {
@@ -371,12 +371,12 @@
             <div class="content"><div class='highlight'><pre><span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">arg</span>(<span class="hljs-params">x, coercion</span>) </span>{ <span class="hljs-keyword">return</span> <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">form</span>) </span>{
 		<span class="hljs-keyword">let</span> temp = <span class="hljs-keyword">new</span> Var(<span class="hljs-string">"?"</span>);
 		<span class="hljs-keyword">let</span> coerciedTmp = coercion(temp);
-		<span class="hljs-keyword">if</span> (coerciedTmp <span class="hljs-keyword">instanceof</span> Ann) {
-			<span class="hljs-keyword">if</span> (form <span class="hljs-keyword">instanceof</span> Ann) {
-				<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Ann(form.body,
+		<span class="hljs-keyword">if</span> (coerciedTmp <span class="hljs-keyword">instanceof</span> Annotate) {
+			<span class="hljs-keyword">if</span> (form <span class="hljs-keyword">instanceof</span> Annotate) {
+				<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Annotate(form.body,
 					form.type.subst(<span class="hljs-keyword">new</span> <span class="hljs-built_in">Map</span>([[<span class="hljs-string">"?ARG"</span> + x, coerciedTmp.type]])));
 			} <span class="hljs-keyword">else</span> {
-				<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Ann(form,
+				<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Annotate(form,
 					<span class="hljs-keyword">new</span> Composite(<span class="hljs-keyword">new</span> Slot(<span class="hljs-string">"?CTOR"</span> + x), coerciedTmp.type));
 			}
 		} <span class="hljs-keyword">else</span> {
@@ -400,14 +400,14 @@
             </div>
             
             <div class="content"><div class='highlight'><pre><span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">buildGL</span>(<span class="hljs-params">m1, e</span>) </span>{
-	<span class="hljs-keyword">if</span> (e <span class="hljs-keyword">instanceof</span> GreatLambda) {
+	<span class="hljs-keyword">if</span> (e <span class="hljs-keyword">instanceof</span> Generic) {
 		<span class="hljs-keyword">let</span> m2 = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Set</span>(e.quantifiers);
 		<span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> k <span class="hljs-keyword">in</span> m1) {
 			m2.add(k);
 		}
-		<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> GreatLambda(<span class="hljs-built_in">Array</span>.from(m2), e.body);
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Generic(<span class="hljs-built_in">Array</span>.from(m2), e.body);
 	} <span class="hljs-keyword">else</span> {
-		<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> GreatLambda(<span class="hljs-built_in">Array</span>.from(m1), e);
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Generic(<span class="hljs-built_in">Array</span>.from(m1), e);
 	}
 }</pre></div></div>
             
@@ -1135,7 +1135,7 @@
 	}
 	format() {
 		<span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.quantifiers.length) {
-			<span class="hljs-keyword">return</span> [<span class="hljs-string">"forall"</span>.cyan.bold, 
+			<span class="hljs-keyword">return</span> [<span class="hljs-string">"forall"</span>.blue.bold,
 				<span class="hljs-keyword">this</span>.quantifiers.map(<span class="hljs-function"><span class="hljs-params">x</span> =&gt;</span> <span class="hljs-keyword">new</span> Slot(x).format()), <span class="hljs-keyword">this</span>.body.format()];
 		} <span class="hljs-keyword">else</span> {
 			<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.body.format();
@@ -1202,7 +1202,7 @@
 			<span class="hljs-attr">type</span>: rho,
 			<span class="hljs-attr">coercion</span>: <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">x</span>) </span>{
 				<span class="hljs-keyword">if</span> (m.size) {
-					<span class="hljs-keyword">if</span> (x <span class="hljs-keyword">instanceof</span> App &amp;&amp; x.fn <span class="hljs-keyword">instanceof</span> Inst) {
+					<span class="hljs-keyword">if</span> (x <span class="hljs-keyword">instanceof</span> Invoke &amp;&amp; x.fn <span class="hljs-keyword">instanceof</span> Inst) {
 						<span class="hljs-keyword">let</span> m1 = x.fn.args;
 						<span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> [k, v] <span class="hljs-keyword">of</span> m.entries()) {
 							m1.set(k, v);
@@ -1753,7 +1753,7 @@
 
             </div>
             
-            <div class="content"><div class='highlight'><pre><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Lit</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Term</span> </span>{
+            <div class="content"><div class='highlight'><pre><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Literal</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Term</span> </span>{
 	<span class="hljs-comment">/**
 	 * @param {any} n
 	 */</span>
@@ -1914,7 +1914,7 @@
 
             </div>
             
-            <div class="content"><div class='highlight'><pre><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">App</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Term</span> </span>{
+            <div class="content"><div class='highlight'><pre><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Invoke</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Term</span> </span>{
 	<span class="hljs-comment">/**
 	 * @param {Term} fn
 	 * @param {Term} arg
@@ -1925,7 +1925,7 @@
 		<span class="hljs-keyword">this</span>.arg = arg;
 	}
 	format() {
-		<span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.fn <span class="hljs-keyword">instanceof</span> App) {
+		<span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.fn <span class="hljs-keyword">instanceof</span> Invoke) {
 			<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.fn.format().concat([<span class="hljs-keyword">this</span>.arg.format()]);
 		} <span class="hljs-keyword">else</span> {
 			<span class="hljs-keyword">return</span> [<span class="hljs-keyword">this</span>.fn.format(), <span class="hljs-keyword">this</span>.arg.format()];
@@ -1937,7 +1937,7 @@
 	 * @returns{Term}
 	 */</span>
 	subst(id, replacement) {
-		<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> App(<span class="hljs-keyword">this</span>.fn.subst(id, replacement),
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Invoke(<span class="hljs-keyword">this</span>.fn.subst(id, replacement),
 			<span class="hljs-keyword">this</span>.arg.subst(id, replacement));
 	}</pre></div></div>
             
@@ -1959,7 +1959,7 @@
 		<span class="hljs-keyword">const</span> [argTy, resTy] = unifyFun(funTy, env);
 		<span class="hljs-keyword">const</span> e2 = <span class="hljs-keyword">this</span>.arg.checkSigma(env, argTy);
 		<span class="hljs-keyword">const</span> f = resTy.instSigmaCheck(env, expected);
-		<span class="hljs-keyword">return</span> f(<span class="hljs-keyword">new</span> App(e1, e2));
+		<span class="hljs-keyword">return</span> f(<span class="hljs-keyword">new</span> Invoke(e1, e2));
 	}</pre></div></div>
             
         </li>
@@ -1980,7 +1980,7 @@
 		<span class="hljs-keyword">const</span> [argTy, resTy] = unifyFun(funTy, env);
 		<span class="hljs-keyword">const</span> e2 = <span class="hljs-keyword">this</span>.arg.checkSigma(env, argTy);
 		<span class="hljs-keyword">const</span> {<span class="hljs-attr">type</span>: t, <span class="hljs-attr">coercion</span>: f} = resTy.instSigmaInfer(env);
-		<span class="hljs-keyword">return</span> {<span class="hljs-attr">type</span>: t, <span class="hljs-attr">tagged</span>: f(<span class="hljs-keyword">new</span> App(e1, e2))};
+		<span class="hljs-keyword">return</span> {<span class="hljs-attr">type</span>: t, <span class="hljs-attr">tagged</span>: f(<span class="hljs-keyword">new</span> Invoke(e1, e2))};
 	}
 }</pre></div></div>
             
@@ -1997,7 +1997,7 @@
 
             </div>
             
-            <div class="content"><div class='highlight'><pre><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Lam</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Term</span> </span>{
+            <div class="content"><div class='highlight'><pre><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Lambda</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Term</span> </span>{
 	<span class="hljs-comment">/**
 	 * @param {string} param
 	 * @param {Term} body
@@ -2017,7 +2017,7 @@
 	 */</span>
 	subst(id, replacement) {
 		<span class="hljs-keyword">if</span> (id != <span class="hljs-keyword">this</span>.param) {
-			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Lam(<span class="hljs-keyword">this</span>.param, <span class="hljs-keyword">this</span>.body.subst(id, replacement));
+			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Lambda(<span class="hljs-keyword">this</span>.param, <span class="hljs-keyword">this</span>.body.subst(id, replacement));
 		} <span class="hljs-keyword">else</span> {
 			<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>;
 		}
@@ -2044,7 +2044,7 @@
 		<span class="hljs-keyword">const</span> [varTy, bodyTy] = unifyFun(expected, env);
 		<span class="hljs-keyword">const</span> env1 = env.extend(<span class="hljs-keyword">this</span>.param, varTy);
 		<span class="hljs-keyword">const</span> e = <span class="hljs-keyword">this</span>.body.checkRho(env1, bodyTy); <span class="hljs-comment">// bodyTy is always a Rho-type.</span>
-		<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> ALam(<span class="hljs-keyword">this</span>.param, varTy, e);
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> AnnotatedLambda(<span class="hljs-keyword">this</span>.param, varTy, e);
 	}</pre></div></div>
             
         </li>
@@ -2070,7 +2070,7 @@
 		<span class="hljs-keyword">const</span> {<span class="hljs-attr">type</span>: bodyTy, <span class="hljs-attr">tagged</span>: e} = <span class="hljs-keyword">this</span>.body.inferRho(env1);
 		<span class="hljs-keyword">return</span> {
 			<span class="hljs-attr">type</span>: FunctionType(varTy, bodyTy),
-			<span class="hljs-attr">tagged</span>: <span class="hljs-keyword">new</span> ALam(<span class="hljs-keyword">this</span>.param, varTy, e)
+			<span class="hljs-attr">tagged</span>: <span class="hljs-keyword">new</span> AnnotatedLambda(<span class="hljs-keyword">this</span>.param, varTy, e)
 		};
 	}
 }</pre></div></div>
@@ -2088,7 +2088,7 @@
 
             </div>
             
-            <div class="content"><div class='highlight'><pre><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">ALam</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Term</span> </span>{
+            <div class="content"><div class='highlight'><pre><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">AnnotatedLambda</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Term</span> </span>{
 	<span class="hljs-comment">/**
 	 * @param {string} param
 	 * @param {Type} type
@@ -2110,7 +2110,7 @@
 	 */</span>
 	subst(id, replacement) {
 		<span class="hljs-keyword">if</span> (id != <span class="hljs-keyword">this</span>.param) {
-			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> ALam(<span class="hljs-keyword">this</span>.param, <span class="hljs-keyword">this</span>.type, <span class="hljs-keyword">this</span>.body.subst(id, replacement));
+			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> AnnotatedLambda(<span class="hljs-keyword">this</span>.param, <span class="hljs-keyword">this</span>.type, <span class="hljs-keyword">this</span>.body.subst(id, replacement));
 		} <span class="hljs-keyword">else</span> {
 			<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>;
 		}
@@ -2138,8 +2138,8 @@
 		<span class="hljs-keyword">const</span> f = varTy.subsCheck(<span class="hljs-keyword">this</span>.type);
 		<span class="hljs-keyword">const</span> env1 = env.extend(<span class="hljs-keyword">this</span>.param, varTy);
 		<span class="hljs-keyword">const</span> e = <span class="hljs-keyword">this</span>.body.checkRho(env1, bodyTy);
-		<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> ALam(<span class="hljs-keyword">this</span>.param, varTy,
-			e.subst(<span class="hljs-keyword">this</span>.param, <span class="hljs-keyword">new</span> App(f, <span class="hljs-keyword">new</span> Var(<span class="hljs-keyword">this</span>.param))));
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> AnnotatedLambda(<span class="hljs-keyword">this</span>.param, varTy,
+			e.subst(<span class="hljs-keyword">this</span>.param, <span class="hljs-keyword">new</span> Invoke(f, <span class="hljs-keyword">new</span> Var(<span class="hljs-keyword">this</span>.param))));
 	}</pre></div></div>
             
         </li>
@@ -2164,7 +2164,7 @@
 		<span class="hljs-keyword">const</span> {<span class="hljs-attr">type</span>: bodyTy, <span class="hljs-attr">tagged</span>: e} = <span class="hljs-keyword">this</span>.body.inferRho(env1);
 		<span class="hljs-keyword">return</span> {
 			<span class="hljs-attr">type</span>: FunctionType(<span class="hljs-keyword">this</span>.type, bodyTy),
-			<span class="hljs-attr">tagged</span>: <span class="hljs-keyword">new</span> ALam(<span class="hljs-keyword">this</span>.param, <span class="hljs-keyword">this</span>.type, e)
+			<span class="hljs-attr">tagged</span>: <span class="hljs-keyword">new</span> AnnotatedLambda(<span class="hljs-keyword">this</span>.param, <span class="hljs-keyword">this</span>.type, e)
 		};
 	}
 }</pre></div></div>
@@ -2393,7 +2393,7 @@
 			<span class="hljs-keyword">let</span> f = type ? type.subsCheck(env, inferredType) : <span class="hljs-literal">null</span>;
 			<span class="hljs-keyword">if</span> (f) {
 				<span class="hljs-keyword">return</span> {name, <span class="hljs-attr">type</span>: inferredType,
-				<span class="hljs-attr">tagged</span>: e.subst(name, <span class="hljs-keyword">new</span> App(f, <span class="hljs-keyword">new</span> Var(name)))};
+				<span class="hljs-attr">tagged</span>: e.subst(name, <span class="hljs-keyword">new</span> Invoke(f, <span class="hljs-keyword">new</span> Var(name)))};
 			} <span class="hljs-keyword">else</span> {
 				<span class="hljs-keyword">return</span> {name, <span class="hljs-attr">type</span>: inferredType, <span class="hljs-attr">tagged</span>: e};
 			}
@@ -2422,7 +2422,7 @@
 
             </div>
             
-            <div class="content"><div class='highlight'><pre><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Ann</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Term</span> </span>{
+            <div class="content"><div class='highlight'><pre><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Annotate</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Term</span> </span>{
 	<span class="hljs-comment">/**
 	 * @param {Type} type
 	 * @param {Term} body
@@ -2450,7 +2450,7 @@
             
             <div class="content"><div class='highlight'><pre>	}
 	subst(name, replacement) {
-		<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Ann(<span class="hljs-keyword">this</span>.body.subst(name, replacement), <span class="hljs-keyword">this</span>.type);
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Annotate(<span class="hljs-keyword">this</span>.body.subst(name, replacement), <span class="hljs-keyword">this</span>.type);
 	}</pre></div></div>
             
         </li>
@@ -2514,7 +2514,7 @@
 
             </div>
             
-            <div class="content"><div class='highlight'><pre><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">GreatLambda</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Term</span> </span>{
+            <div class="content"><div class='highlight'><pre><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Generic</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Term</span> </span>{
 	<span class="hljs-comment">/**
 	 * @param {Array&lt;Slot&gt;} quantifiers
 	 * @param {Term} body
@@ -2526,7 +2526,7 @@
 	}
 	format() {
 		<span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.quantifiers.length) {
-			<span class="hljs-keyword">return</span> [<span class="hljs-string">"Λ"</span>.yellow.bold, <span class="hljs-keyword">this</span>.quantifiers.map(<span class="hljs-function"><span class="hljs-params">x</span> =&gt;</span> <span class="hljs-keyword">new</span> Slot(x).format()), <span class="hljs-keyword">this</span>.body.format()];
+			<span class="hljs-keyword">return</span> [<span class="hljs-string">"generic"</span>.green.bold, <span class="hljs-keyword">this</span>.quantifiers.map(<span class="hljs-function"><span class="hljs-params">x</span> =&gt;</span> <span class="hljs-keyword">new</span> Slot(x).format()), <span class="hljs-keyword">this</span>.body.format()];
 		} <span class="hljs-keyword">else</span> {
 			<span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.body.format();
 		}
@@ -2537,7 +2537,7 @@
 	 * @returns{Term}
 	 */</span>
 	subst(id, replacement) {
-		<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> GreatLambda(<span class="hljs-keyword">this</span>.quantifiers, <span class="hljs-keyword">this</span>.body.subst(id, replacement));
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Generic(<span class="hljs-keyword">this</span>.quantifiers, <span class="hljs-keyword">this</span>.body.subst(id, replacement));
 	}
 }</pre></div></div>
             
@@ -2569,7 +2569,7 @@
 		<span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> [k, v] <span class="hljs-keyword">of</span> <span class="hljs-keyword">this</span>.args) {
 			buf.push([<span class="hljs-string">"="</span>, <span class="hljs-keyword">new</span> Slot(k).format(), v.zonk().format()]);
 		}
-		<span class="hljs-keyword">return</span> [<span class="hljs-string">"inst"</span>.yellow.bold, <span class="hljs-keyword">this</span>.body.format()].concat(buf);
+		<span class="hljs-keyword">return</span> [<span class="hljs-string">"inst"</span>.green.bold, <span class="hljs-keyword">this</span>.body.format()].concat(buf);
 	}
 	<span class="hljs-comment">/**
 	 * @param{string} id
@@ -2675,7 +2675,7 @@
  */</span>
 <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">translate</span>(<span class="hljs-params">a</span>) </span>{
 	<span class="hljs-keyword">if</span> (!a) {
-		<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Lit(a);
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Literal(a);
 	} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (a <span class="hljs-keyword">instanceof</span> <span class="hljs-built_in">Array</span>) {
 		<span class="hljs-keyword">if</span> (a[<span class="hljs-number">0</span>] === <span class="hljs-string">"let"</span>) {
 			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Let(
@@ -2692,21 +2692,21 @@
 		} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (a[<span class="hljs-number">0</span>] === <span class="hljs-string">"lambda"</span> &amp;&amp; a.length &gt;= <span class="hljs-number">3</span>) {
 			<span class="hljs-keyword">const</span> fn0 = translate(a[a.length - <span class="hljs-number">1</span>]);
 			<span class="hljs-keyword">return</span> a.slice(<span class="hljs-number">1</span>, <span class="hljs-number">-1</span>).reduceRight(<span class="hljs-function">(<span class="hljs-params">fn, term</span>) =&gt;</span> (<span class="hljs-keyword">typeof</span> term === <span class="hljs-string">"string"</span>)
-				? <span class="hljs-keyword">new</span> Lam(term, fn)
-				: <span class="hljs-keyword">new</span> ALam(term[<span class="hljs-number">0</span>], translateType(term[<span class="hljs-number">1</span>]), fn), fn0);
+				? <span class="hljs-keyword">new</span> Lambda(term, fn)
+				: <span class="hljs-keyword">new</span> AnnotatedLambda(term[<span class="hljs-number">0</span>], translateType(term[<span class="hljs-number">1</span>]), fn), fn0);
 		} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (a[<span class="hljs-number">0</span>] === <span class="hljs-string">"begin"</span>) {
 			<span class="hljs-keyword">return</span> translate(a.slice(<span class="hljs-number">1</span>).reduceRight(<span class="hljs-function">(<span class="hljs-params">y, x</span>) =&gt;</span> [<span class="hljs-string">"seq"</span>, x, y]));
 		} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (a[<span class="hljs-number">0</span>] === <span class="hljs-string">"::"</span>) {
-			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Ann(translate(a[<span class="hljs-number">1</span>]), translateType(a[<span class="hljs-number">2</span>]));
+			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Annotate(translate(a[<span class="hljs-number">1</span>]), translateType(a[<span class="hljs-number">2</span>]));
 		} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (a.length === <span class="hljs-number">2</span>) {
-			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> App(translate(a[<span class="hljs-number">0</span>]), translate(a[<span class="hljs-number">1</span>]));
+			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Invoke(translate(a[<span class="hljs-number">0</span>]), translate(a[<span class="hljs-number">1</span>]));
 		} <span class="hljs-keyword">else</span> {
-			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> App(translate(a.slice(<span class="hljs-number">0</span>, a.length - <span class="hljs-number">1</span>)), translate(a[a.length - <span class="hljs-number">1</span>]));
+			<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Invoke(translate(a.slice(<span class="hljs-number">0</span>, a.length - <span class="hljs-number">1</span>)), translate(a[a.length - <span class="hljs-number">1</span>]));
 		}
 	} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> a === <span class="hljs-string">"string"</span>) {
 		<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Var(a);
 	} <span class="hljs-keyword">else</span> {
-		<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Lit(a);
+		<span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Literal(a);
 	}
 }</pre></div></div>
             

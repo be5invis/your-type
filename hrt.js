@@ -125,10 +125,10 @@ function rawNameOfskolmeizedName(n) {
 // 为某个项附加类型信息
 function tag(type) {
 	return function (form) {
-		if (form instanceof Ann) {
-			return new Ann(form.body, type);
+		if (form instanceof Annotate) {
+			return new Annotate(form.body, type);
 		} else {
-			return new Ann(form, type);
+			return new Annotate(form, type);
 		}
 	};
 }
@@ -137,12 +137,12 @@ function tag(type) {
 function ctor(x, coercion) { return function (form) {
 		let temp = new Var("?");
 		let coerciedTmp = coercion(temp);
-		if (coerciedTmp instanceof Ann) {
-			if (form instanceof Ann) {
-				return new Ann(form.body,
+		if (coerciedTmp instanceof Annotate) {
+			if (form instanceof Annotate) {
+				return new Annotate(form.body,
 					form.type.subst(new Map([["?CTOR" + x, coerciedTmp.type]])));
 			} else {
-				return new Ann(form,
+				return new Annotate(form,
 					new Composite(coerciedTmp.type, new Slot("?ARG" + x)));
 			}
 		} else {
@@ -155,12 +155,12 @@ function ctor(x, coercion) { return function (form) {
 function arg(x, coercion) { return function (form) {
 		let temp = new Var("?");
 		let coerciedTmp = coercion(temp);
-		if (coerciedTmp instanceof Ann) {
-			if (form instanceof Ann) {
-				return new Ann(form.body,
+		if (coerciedTmp instanceof Annotate) {
+			if (form instanceof Annotate) {
+				return new Annotate(form.body,
 					form.type.subst(new Map([["?ARG" + x, coerciedTmp.type]])));
 			} else {
-				return new Ann(form,
+				return new Annotate(form,
 					new Composite(new Slot("?CTOR" + x), coerciedTmp.type));
 			}
 		} else {
@@ -171,14 +171,14 @@ function arg(x, coercion) { return function (form) {
 // #### buildGL :: Map string Type × Term → Term
 // 构造一个 System-F 的 $\Lambda$ 项
 function buildGL(m1, e) {
-	if (e instanceof GreatLambda) {
+	if (e instanceof Generic) {
 		let m2 = new Set(e.quantifiers);
 		for (let k in m1) {
 			m2.add(k);
 		}
-		return new GreatLambda(Array.from(m2), e.body);
+		return new Generic(Array.from(m2), e.body);
 	} else {
-		return new GreatLambda(Array.from(m1), e);
+		return new Generic(Array.from(m1), e);
 	}
 }
 
@@ -552,7 +552,7 @@ class ForAll extends Type {
 	}
 	format() {
 		if (this.quantifiers.length) {
-			return ["forall".cyan.bold, 
+			return ["forall".blue.bold,
 				this.quantifiers.map(x => new Slot(x).format()), this.body.format()];
 		} else {
 			return this.body.format();
@@ -593,7 +593,7 @@ class ForAll extends Type {
 			type: rho,
 			coercion: function (x) {
 				if (m.size) {
-					if (x instanceof App && x.fn instanceof Inst) {
+					if (x instanceof Invoke && x.fn instanceof Inst) {
 						let m1 = x.fn.args;
 						for (let [k, v] of m.entries()) {
 							m1.set(k, v);
@@ -930,7 +930,7 @@ class Term {
 	}
 }
 // ### 直接量
-class Lit extends Term {
+class Literal extends Term {
 	/**
 	 * @param {any} n
 	 */
@@ -1013,7 +1013,7 @@ class Var extends Term {
 	}
 }
 // ### 函数调用
-class App extends Term {
+class Invoke extends Term {
 	/**
 	 * @param {Term} fn
 	 * @param {Term} arg
@@ -1024,7 +1024,7 @@ class App extends Term {
 		this.arg = arg;
 	}
 	format() {
-		if (this.fn instanceof App) {
+		if (this.fn instanceof Invoke) {
 			return this.fn.format().concat([this.arg.format()]);
 		} else {
 			return [this.fn.format(), this.arg.format()];
@@ -1036,7 +1036,7 @@ class App extends Term {
 	 * @returns{Term}
 	 */
 	subst(id, replacement) {
-		return new App(this.fn.subst(id, replacement),
+		return new Invoke(this.fn.subst(id, replacement),
 			this.arg.subst(id, replacement));
 	}
 	// CHECK-APP: $\dfrac{\Gamma\vdash t:\sim(\sigma \rightarrow \sigma')\quad \Gamma\vdash^*u:\sigma\quad \sigma'\le\rho'}{\Gamma\vdash t\ u : \rho}$
@@ -1045,7 +1045,7 @@ class App extends Term {
 		const [argTy, resTy] = unifyFun(funTy, env);
 		const e2 = this.arg.checkSigma(env, argTy);
 		const f = resTy.instSigmaCheck(env, expected);
-		return f(new App(e1, e2));
+		return f(new Invoke(e1, e2));
 	}
 	// INFER-APP: $\dfrac{\Gamma\vdash t:\sim(\sigma \rightarrow \sigma')\quad\Gamma\vdash^* u:\sigma\quad \sigma'\le\sim\rho'}{\Gamma\vdash t\ u :\sim \rho}$
 	_inferRho(env) {
@@ -1053,11 +1053,11 @@ class App extends Term {
 		const [argTy, resTy] = unifyFun(funTy, env);
 		const e2 = this.arg.checkSigma(env, argTy);
 		const {type: t, coercion: f} = resTy.instSigmaInfer(env);
-		return {type: t, tagged: f(new App(e1, e2))};
+		return {type: t, tagged: f(new Invoke(e1, e2))};
 	}
 }
 // ### 函数抽象
-class Lam extends Term {
+class Lambda extends Term {
 	/**
 	 * @param {string} param
 	 * @param {Term} body
@@ -1077,7 +1077,7 @@ class Lam extends Term {
 	 */
 	subst(id, replacement) {
 		if (id != this.param) {
-			return new Lam(this.param, this.body.subst(id, replacement));
+			return new Lambda(this.param, this.body.subst(id, replacement));
 		} else {
 			return this;
 		}
@@ -1091,7 +1091,7 @@ class Lam extends Term {
 		const [varTy, bodyTy] = unifyFun(expected, env);
 		const env1 = env.extend(this.param, varTy);
 		const e = this.body.checkRho(env1, bodyTy); // bodyTy is always a Rho-type.
-		return new ALam(this.param, varTy, e);
+		return new AnnotatedLambda(this.param, varTy, e);
 	}
 	// INFER-LAM: $\dfrac{\Gamma, x:\tau\vdash t:\sim\rho}{\Gamma\vdash(\lambda\ x.t):\sim\tau\rightarrow\rho}$
 	/**
@@ -1104,12 +1104,12 @@ class Lam extends Term {
 		const {type: bodyTy, tagged: e} = this.body.inferRho(env1);
 		return {
 			type: FunctionType(varTy, bodyTy),
-			tagged: new ALam(this.param, varTy, e)
+			tagged: new AnnotatedLambda(this.param, varTy, e)
 		};
 	}
 }
 // ### 标记了参数类型的函数抽象
-class ALam extends Term {
+class AnnotatedLambda extends Term {
 	/**
 	 * @param {string} param
 	 * @param {Type} type
@@ -1131,7 +1131,7 @@ class ALam extends Term {
 	 */
 	subst(id, replacement) {
 		if (id != this.param) {
-			return new ALam(this.param, this.type, this.body.subst(id, replacement));
+			return new AnnotatedLambda(this.param, this.type, this.body.subst(id, replacement));
 		} else {
 			return this;
 		}
@@ -1146,8 +1146,8 @@ class ALam extends Term {
 		const f = varTy.subsCheck(this.type);
 		const env1 = env.extend(this.param, varTy);
 		const e = this.body.checkRho(env1, bodyTy);
-		return new ALam(this.param, varTy,
-			e.subst(this.param, new App(f, new Var(this.param))));
+		return new AnnotatedLambda(this.param, varTy,
+			e.subst(this.param, new Invoke(f, new Var(this.param))));
 	}
 	// INFER-ALAM: $\dfrac{\Gamma, x:\sigma\vdash t:\sim\rho}{\Gamma\vdash(\lambda(x:\sigma).t):\sim\sigma\rightarrow\rho}$
 	/**
@@ -1159,7 +1159,7 @@ class ALam extends Term {
 		const {type: bodyTy, tagged: e} = this.body.inferRho(env1);
 		return {
 			type: FunctionType(this.type, bodyTy),
-			tagged: new ALam(this.param, this.type, e)
+			tagged: new AnnotatedLambda(this.param, this.type, e)
 		};
 	}
 }
@@ -1313,7 +1313,7 @@ class LetRec extends Term {
 			let f = type ? type.subsCheck(env, inferredType) : null;
 			if (f) {
 				return {name, type: inferredType,
-				tagged: e.subst(name, new App(f, new Var(name)))};
+				tagged: e.subst(name, new Invoke(f, new Var(name)))};
 			} else {
 				return {name, type: inferredType, tagged: e};
 			}
@@ -1329,7 +1329,7 @@ class LetRec extends Term {
 	}
 }
 // ### 显式窄化
-class Ann extends Term {
+class Annotate extends Term {
 	/**
 	 * @param {Type} type
 	 * @param {Term} body
@@ -1344,7 +1344,7 @@ class Ann extends Term {
 	// return ["::", this.body.format(), this.type.zonk().format()];
 	}
 	subst(name, replacement) {
-		return new Ann(this.body.subst(name, replacement), this.type);
+		return new Annotate(this.body.subst(name, replacement), this.type);
 	}
 	// CHECK-ANN: $\dfrac{\Gamma\vdash^* t:\sigma \quad \sigma\le\rho}{\Gamma\vdash(t:\sigma):\rho}$
 	/**
@@ -1370,7 +1370,7 @@ class Ann extends Term {
 // 以下的项目为 System F 的高阶构造，它们主要用于构造约制子。
 // 
 // ### System-F 类型抽象，$\Lambda\overline\alpha.e$
-class GreatLambda extends Term {
+class Generic extends Term {
 	/**
 	 * @param {Array<Slot>} quantifiers
 	 * @param {Term} body
@@ -1382,7 +1382,7 @@ class GreatLambda extends Term {
 	}
 	format() {
 		if (this.quantifiers.length) {
-			return ["Λ".yellow.bold, this.quantifiers.map(x => new Slot(x).format()), this.body.format()];
+			return ["generic".green.bold, this.quantifiers.map(x => new Slot(x).format()), this.body.format()];
 		} else {
 			return this.body.format();
 		}
@@ -1393,7 +1393,7 @@ class GreatLambda extends Term {
 	 * @returns{Term}
 	 */
 	subst(id, replacement) {
-		return new GreatLambda(this.quantifiers, this.body.subst(id, replacement));
+		return new Generic(this.quantifiers, this.body.subst(id, replacement));
 	}
 }
 // ### System-F 显式类型实例化。$\mathrm{Inst}(\alpha\rightarrow\rho)=\lambda x.x^{\{\alpha=\rho\}}$
@@ -1412,7 +1412,7 @@ class Inst extends Term {
 		for (let [k, v] of this.args) {
 			buf.push(["=", new Slot(k).format(), v.zonk().format()]);
 		}
-		return ["inst".yellow.bold, this.body.format()].concat(buf);
+		return ["inst".green.bold, this.body.format()].concat(buf);
 	}
 	/**
 	 * @param{string} id
@@ -1469,7 +1469,7 @@ function translateType(a) {
  */
 function translate(a) {
 	if (!a) {
-		return new Lit(a);
+		return new Literal(a);
 	} else if (a instanceof Array) {
 		if (a[0] === "let") {
 			return new Let(
@@ -1486,21 +1486,21 @@ function translate(a) {
 		} else if (a[0] === "lambda" && a.length >= 3) {
 			const fn0 = translate(a[a.length - 1]);
 			return a.slice(1, -1).reduceRight((fn, term) => (typeof term === "string")
-				? new Lam(term, fn)
-				: new ALam(term[0], translateType(term[1]), fn), fn0);
+				? new Lambda(term, fn)
+				: new AnnotatedLambda(term[0], translateType(term[1]), fn), fn0);
 		} else if (a[0] === "begin") {
 			return translate(a.slice(1).reduceRight((y, x) => ["seq", x, y]));
 		} else if (a[0] === "::") {
-			return new Ann(translate(a[1]), translateType(a[2]));
+			return new Annotate(translate(a[1]), translateType(a[2]));
 		} else if (a.length === 2) {
-			return new App(translate(a[0]), translate(a[1]));
+			return new Invoke(translate(a[0]), translate(a[1]));
 		} else {
-			return new App(translate(a.slice(0, a.length - 1)), translate(a[a.length - 1]));
+			return new Invoke(translate(a.slice(0, a.length - 1)), translate(a[a.length - 1]));
 		}
 	} else if (typeof a === "string") {
 		return new Var(a);
 	} else {
-		return new Lit(a);
+		return new Literal(a);
 	}
 }
 
