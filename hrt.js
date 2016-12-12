@@ -929,7 +929,7 @@ class Term {
 		}
 	}
 }
-// ### 直接量
+// ### 直接量，$\iota$
 class Literal extends Term {
 	/**
 	 * @param {any} n
@@ -978,7 +978,7 @@ class Literal extends Term {
 		}
 	}
 }
-// ### 变量
+// ### 变量，$x$
 class Var extends Term {
 	/**
 	 * @param {string} name
@@ -1012,7 +1012,7 @@ class Var extends Term {
 		return {type, tagged: f(this)};
 	}
 }
-// ### 函数调用
+// ### 函数调用，$e_1 \ e_2$
 class Invoke extends Term {
 	/**
 	 * @param {Term} fn
@@ -1056,7 +1056,7 @@ class Invoke extends Term {
 		return {type: t, tagged: f(new Invoke(e1, e2))};
 	}
 }
-// ### 函数抽象
+// ### 函数抽象，$\lambda x. e$
 class Lambda extends Term {
 	/**
 	 * @param {string} param
@@ -1108,7 +1108,7 @@ class Lambda extends Term {
 		};
 	}
 }
-// ### 标记了参数类型的函数抽象
+// ### 标记了参数类型的函数抽象，$\lambda (x:\sigma).e$
 class AnnotatedLambda extends Term {
 	/**
 	 * @param {string} param
@@ -1164,7 +1164,7 @@ class AnnotatedLambda extends Term {
 	}
 }
 
-// ### 非递归 Let 绑定
+// ### 非递归 Let 绑定，$\mathbf{let}\ (\overline{x=e}). f$
 class Let extends Term {
 	/**
 	 * @param {Array<{name: string, bind: Term}>} terms
@@ -1232,7 +1232,7 @@ class Let extends Term {
 		};
 	}
 }
-// ### 递归 Let 绑定
+// ### 递归 Let 绑定，$\mathbf{let\ rec}\ (\overline{x=e}). f$、$\mathbf{let\ rec}\ (\overline{x:\sigma =e}). f$
 class LetRec extends Term {
 	/**
 	 * @param {Array<{name: string, bind: Term, type: Type?}>} terms
@@ -1328,7 +1328,7 @@ class LetRec extends Term {
 		};
 	}
 }
-// ### 显式窄化
+// ### 显式窄化，$x^\sigma$
 class Annotate extends Term {
 	/**
 	 * @param {Type} type
@@ -1341,7 +1341,7 @@ class Annotate extends Term {
 	}
 	format() {
 		return this.body.format();
-	// return ["::", this.body.format(), this.type.zonk().format()];
+		/* return ["::", this.body.format(), this.type.zonk().format()]; */
 	}
 	subst(name, replacement) {
 		return new Annotate(this.body.subst(name, replacement), this.type);
@@ -1367,7 +1367,7 @@ class Annotate extends Term {
 		return {type, tagged: f(e)};
 	}
 }
-// 以下的项目为 System F 的高阶构造，它们主要用于构造约制子。
+// 以下的项目为 System F 的二阶 $\Lambda$ 抽象和类型尺度调用。
 // 
 // ### System-F 类型抽象，$\Lambda\overline\alpha.e$
 class Generic extends Term {
@@ -1396,7 +1396,7 @@ class Generic extends Term {
 		return new Generic(this.quantifiers, this.body.subst(id, replacement));
 	}
 }
-// ### System-F 显式类型实例化。$\mathrm{Inst}(\alpha\rightarrow\rho)=\lambda x.x^{\{\alpha=\rho\}}$
+// ### System-F 显式类型实例化。$\mathrm{Inst}\ (\overline{\alpha\rightarrow\rho})\ x^{\forall \alpha. \phi}=x^{\phi[\overline{\alpha/\rho}]}$
 class Inst extends Term {
 	/**
 	 * @param {Term} body
